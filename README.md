@@ -37,6 +37,20 @@ Next.js admin dashboard for Verve Marketing with MongoDB-backed persistence.
 
 The first request to `/api/bootstrap` seeds example clients, team members, demands, and Instagram metrics when the `clients` collection is empty.
 
+## Vercel
+
+This project includes `vercel.json` to force the `Next.js` framework preset. In Vercel Project Settings, leave Output Directory unset so Vercel can use the Next.js output automatically.
+
+Set these Environment Variables in Vercel:
+
+```env
+MONGODB_URI=your-mongodb-connection-string
+MONGODB_DB=verve
+APP_LOGIN_USERNAME=verve
+APP_LOGIN_PASSWORD=your-dashboard-password
+AUTH_SECRET=your-long-random-session-secret
+```
+
 ## Persistent Data
 
 The dashboard persists these actions through API routes:
