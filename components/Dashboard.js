@@ -135,7 +135,6 @@ export default function Dashboard() {
 
   return (
     <>
-      <div className="preview-banner">Painel conectado ao MongoDB - edições são persistidas no banco configurado</div>
       <header className="topbar">
         <div className="brand">
           <Logo />
