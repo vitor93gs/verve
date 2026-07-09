@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Verve · Prévia do Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --marrom:#4A382D; --marrom-deep:#332619; --vinho:#550B18;
+    --bege:#E5D7BC; --offwhite:#FAF7F2; --azul:#D1E2EC; --ink:#2A2118; --ink-soft:#6B5F52;
+    --line: rgba(74,56,45,0.14);
+    --s1:#A98B5D; --s2:#7A5C3E; --s3:#5C7A5E; --s4:#3E6B7A; --s5:#7A2233;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'DM Sans',sans-serif;background:var(--offwhite);color:var(--ink);}
+
+  .preview-banner{background:var(--marrom-deep);color:var(--offwhite);text-align:center;padding:.55rem;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;}
+
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:1.2rem 2.2rem;border-bottom:1px solid var(--line);flex-wrap:wrap;gap:.8rem;}
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand-text .word{font-family:'Cormorant Garamond',serif;font-size:1.25rem;font-weight:500;color:var(--marrom-deep);}
+  .brand-text .sub{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft);}
+  .mark path{fill:var(--marrom);}
+  .tabs{display:flex;gap:.4rem;flex-wrap:wrap;}
+  .tab-btn{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--line);background:transparent;color:var(--marrom-deep);padding:.55rem .85rem;border-radius:3px;cursor:pointer;}
+  .tab-btn.active{background:var(--marrom);color:var(--offwhite);border-color:var(--marrom);}
+
+  .shell{display:grid;grid-template-columns:260px 1fr;min-height:520px;}
+  @media (max-width:820px){.shell{grid-template-columns:1fr;}}
+  .sidebar{border-right:1px solid var(--line);padding:1rem 0;overflow-y:auto;max-height:640px;}
+  .side-eyebrow{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft);padding:0 1.2rem;margin-bottom:.6rem;}
+  .client-item{padding:.7rem 1.2rem;cursor:pointer;border-left:2px solid transparent;font-size:13px;color:var(--marrom-deep);}
+  .client-item:hover{background:rgba(74,56,45,.05);}
+  .client-item.active{background:var(--bege);border-left-color:var(--marrom);font-weight:500;}
+
+  .main{padding:1.6rem 2rem 2.4rem;}
+  .detail-title{font-family:'Cormorant Garamond',serif;font-size:1.8rem;font-weight:500;color:var(--marrom-deep);}
+  .detail-sub{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin-top:.4rem;}
+  .section-title{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--marrom-deep);margin:1.3rem 0 .7rem;border-bottom:1px solid var(--line);padding-bottom:.4rem;}
+  .link-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:.6rem;}
+  .link-card{border:1px solid var(--line);border-radius:4px;padding:.7rem .85rem;background:#fff;}
+  .link-label{font-size:9px;font-family:'IBM Plex Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);}
+  .link-value{font-size:12px;font-weight:500;}
+
+  .item-row{display:flex;align-items:center;gap:8px;padding:.5rem 0;border-bottom:1px solid var(--line);font-size:13px;flex-wrap:wrap;}
+  .status-badge{font-family:'IBM Plex Mono',monospace;font-size:8.5px;letter-spacing:.05em;text-transform:uppercase;padding:2px 7px;border-radius:20px;}
+  .status-badge.afazer{background:rgba(74,56,45,.1);color:var(--marrom-deep);}
+  .status-badge.atrasado{background:var(--vinho);color:#fff;}
+  .status-badge.concluido{background:var(--marrom);color:#fff;}
+  .item-responsible{font-family:'IBM Plex Mono',monospace;font-size:8.5px;letter-spacing:.05em;text-transform:uppercase;background:var(--azul);color:var(--marrom-deep);padding:2px 7px;border-radius:20px;}
+
+  .btn{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--line);border-radius:3px;padding:.4rem .7rem;cursor:pointer;background:#fff;color:var(--marrom-deep);}
+  .btn:hover{background:var(--bege);}
+
+  .board{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:.7rem;overflow-x:auto;}
+  .board.demandas{grid-template-columns:repeat(6,minmax(150px,1fr));}
+  .board-col{background:rgba(74,56,45,.04);border-radius:6px;padding:.7rem;}
+  .board-col-title{font-family:'IBM Plex Mono',monospace;font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--marrom-deep);margin-bottom:.6rem;}
+  .board-card{background:#fff;border:1px solid var(--line);border-radius:4px;padding:.55rem .6rem;margin-bottom:.5rem;font-size:12px;}
+  .board-card-name{font-weight:500;color:var(--marrom-deep);}
+  .board-card-actions{display:flex;gap:4px;margin-top:.4rem;}
+  .board-card-actions button{font-family:'IBM Plex Mono',monospace;font-size:8.5px;border:1px solid var(--line);background:#fff;border-radius:3px;padding:.2rem .4rem;cursor:pointer;}
+
+  .pauta-client{background:var(--bege);border-radius:4px;padding:.85rem 1rem;margin-bottom:.7rem;}
+  .pauta-client-name{font-family:'Cormorant Garamond',serif;font-size:1.1rem;font-weight:500;color:var(--marrom-deep);}
+  .pauta-item{display:flex;gap:8px;margin-top:.4rem;font-size:12.5px;align-items:center;flex-wrap:wrap;}
+
+  .team-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem;border:1px solid var(--line);border-radius:4px;padding:.6rem .8rem;background:#fff;margin-bottom:.5rem;font-size:12.5px;}
+
+  .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:.8rem;}
+  .calendar-weekday{font-family:'IBM Plex Mono',monospace;font-size:9px;text-align:center;color:var(--ink-soft);text-transform:uppercase;}
+  .calendar-cell{aspect-ratio:1/1;border:1px solid var(--line);border-radius:4px;background:#fff;padding:.3rem;font-size:10.5px;position:relative;}
+  .calendar-cell.empty{border:none;background:transparent;}
+  .calendar-badge{position:absolute;bottom:4px;right:4px;background:var(--marrom);color:#fff;font-size:8px;padding:0 5px;border-radius:20px;font-family:'IBM Plex Mono',monospace;}
+  .calendar-badge.overdue{background:var(--vinho);}
+
+  .chart-wrap{margin:.8rem 0 1.2rem;}
+  .metrics-table{width:100%;border-collapse:collapse;font-size:12px;}
+  .metrics-table th{text-align:left;font-family:'IBM Plex Mono',monospace;font-size:9px;text-transform:uppercase;color:var(--ink-soft);padding:.3rem .5rem .3rem 0;}
+  .metrics-table td{padding:.35rem .5rem .35rem 0;border-top:1px solid var(--line);}
+
+  .stage-pills{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.3rem;}
+  .stage-pill{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--line);background:#fff;color:var(--ink-soft);padding:.4rem .7rem;border-radius:20px;cursor:pointer;}
+
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.6rem;margin-bottom:1.1rem;}
+  .kpi-card{background:var(--marrom);color:var(--offwhite);border-radius:6px;padding:.85rem 1rem;}
+  .kpi-label{font-family:'IBM Plex Mono',monospace;font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;color:rgba(250,247,242,.65);}
+  .kpi-value{font-family:'Cormorant Garamond',serif;font-size:1.55rem;font-weight:500;margin:.2rem 0;}
+  .kpi-delta{font-family:'IBM Plex Mono',monospace;font-size:9.5px;}
+  .kpi-delta.up{color:#8FD19E;}
+  .kpi-delta.down{color:#E39B9B;}
+
+  .mini-chart-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.8rem;margin-bottom:1.2rem;}
+  .mini-chart{background:#fff;border:1px solid var(--line);border-radius:6px;padding:.7rem .8rem;}
+  .mini-chart-head{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:var(--ink-soft);margin-bottom:.3rem;font-family:'IBM Plex Mono',monospace;}
+  .mini-chart-head strong{font-size:14px;font-family:'Cormorant Garamond',serif;}
+</style>
+</head>
+<body>
+
+<div class="preview-banner">Prévia com dados de exemplo — o site publicado terá os dados reais de vocês</div>
+
+<div class="topbar">
+  <div class="brand">
+    <svg class="mark" width="24" height="24" viewBox="0 0 100 100"><path d="M47 8 L53 8 L53 38 L47 38 Z" transform="rotate(0 50 50)"/><path d="M47 8 L53 8 L53 38 L47 38 Z" transform="rotate(60 50 50)"/><path d="M47 8 L53 8 L53 38 L47 38 Z" transform="rotate(120 50 50)"/><path d="M47 8 L53 8 L53 38 L47 38 Z" transform="rotate(180 50 50)"/><path d="M47 8 L53 8 L53 38 L47 38 Z" transform="rotate(240 50 50)"/><path d="M47 8 L53 8 L53 38 L47 38 Z" transform="rotate(300 50 50)"/></svg>
+    <div class="brand-text"><span class="word">verve marketing</span><br><span class="sub">Painel administrativo</span></div>
+  </div>
+  <div class="tabs" id="tabs"></div>
+</div>
+
+<div id="app"></div>
+
+<script>
+const CLIENT_NAMES = ['Ateliê Eliane Ribeiro','Cheiro Verde','Claudia Móveis','Dra. Beatriz Zamboni','Encantos da Mesa','Fernanda Scaliante','Forest Park','Geisse','Haut Consórcios','Kopenhagen','Moove','Natália Ports','NM Engenharia','Rafaela Panucci','Sebastian','Trio','We Bilingual','Daniela','Milane & Moro'];
+
+const clients = CLIENT_NAMES.map((name, i) => ({
+  id: 'c'+i, name,
+  drive: i < 5 ? 'drive.google.com/verve/'+name.toLowerCase().replace(/\s+/g,'-') : '',
+  docs: i < 5 ? 'docs.google.com/verve/'+name.toLowerCase().replace(/\s+/g,'-') : '',
+  instagram: i < 5 ? '@'+name.toLowerCase().replace(/[^a-z]/g,'') : '',
+  stage: ['agendamento','planejamento','producao','producao','postagem','analise'][i % 6]
+}));
+
+const team = [
+  { id:'t1', name:'Bruna', area:'Gestão', email:'bruna@verve.com.br' },
+  { id:'t2', name:'Mayara', area:'Social media', email:'mayara@verve.com.br' },
+  { id:'t3', name:'Luiza', area:'Edição de vídeo', email:'luiza@verve.com.br' },
+  { id:'t4', name:'Naara', area:'Design', email:'naara@verve.com.br' }
+];
+
+const DSTAGES = [
+  { key:'pauta', label:'Pauta' }, { key:'roteiro', label:'Roteiro/Copy' }, { key:'producao', label:'Produção' },
+  { key:'revisao', label:'Revisão' }, { key:'aprovacao_cliente', label:'Aprovação cliente' }, { key:'publicado', label:'Publicado' }
+];
+
+const demands = [
+  { id:'d1', client:'Sebastian', title:'2 conteúdos — campanha julho', respId:'t2', stage:'roteiro', deadline:'2026-07-09', done:false },
+  { id:'d2', client:'Forest Park', title:'Edição — gravação com Vanessa', respId:'t3', stage:'producao', deadline:'2026-07-08', done:false },
+  { id:'d3', client:'Ateliê Eliane Ribeiro', title:'Agendar captação', respId:'', stage:'pauta', deadline:'2026-07-15', done:false },
+  { id:'d4', client:'Dra. Beatriz Zamboni', title:'Entregar vídeos editados', respId:'t3', stage:'revisao', deadline:'2026-07-05', done:false },
+  { id:'d5', client:'Moove', title:'Calendário editorial', respId:'t4', stage:'aprovacao_cliente', deadline:'2026-07-08', done:false },
+  { id:'d6', client:'We Bilingual', title:'Selecionar Friday Memes', respId:'t2', stage:'publicado', deadline:'2026-07-01', done:true }
+];
+
+const MSTAGES = [
+  { key:'agendamento', label:'Agendamento', color:'#A98B5D' },
+  { key:'planejamento', label:'Reunião & Planejamento', color:'#7A5C3E' },
+  { key:'producao', label:'Produção', color:'#5C7A5E' },
+  { key:'postagem', label:'Postagem', color:'#3E6B7A' },
+  { key:'analise', label:'Análise do mês', color:'#7A2233' }
+];
+
+const metricsHistory = {
+  c0: [
+    {m:'Fev', followers:1180, reach:4200, likes:210, comments:18, saves:34, shares:9, visits:96, posts:8},
+    {m:'Mar', followers:1240, reach:4850, likes:265, comments:24, saves:41, shares:12, visits:118, posts:9},
+    {m:'Abr', followers:1310, reach:5300, likes:298, comments:29, saves:52, shares:15, visits:134, posts:10},
+    {m:'Mai', followers:1395, reach:6100, likes:340, comments:33, saves:61, shares:19, visits:157, posts:9},
+    {m:'Jun', followers:1460, reach:6700, likes:378, comments:38, saves:70, shares:22, visits:172, posts:11},
+  ],
+  c6: [
+    {m:'Fev', followers:3200, reach:9800, likes:410, comments:22, saves:58, shares:14, visits:210, posts:6},
+    {m:'Mar', followers:3410, reach:10900, likes:465, comments:27, saves:66, shares:18, visits:245, posts:7},
+    {m:'Abr', followers:3680, reach:12400, likes:520, comments:31, saves:79, shares:21, visits:289, posts:8},
+    {m:'Mai', followers:3920, reach:14100, likes:598, comments:39, saves:94, shares:27, visits:334, posts:8},
+    {m:'Jun', followers:4230, reach:15600, likes:672, comments:45, saves:108, shares:33, visits:378, posts:9},
+  ],
+  c3: [
+    {m:'Fev', followers:5100, reach:18200, likes:880, comments:64, saves:150, shares:40, visits:520, posts:12},
+    {m:'Mar', followers:5340, reach:19500, likes:940, comments:70, saves:168, shares:45, visits:560, posts:13},
+    {m:'Abr', followers:5590, reach:20100, likes:965, comments:68, saves:172, shares:44, visits:545, posts:11},
+    {m:'Mai', followers:5810, reach:22300, likes:1050, comments:79, saves:198, shares:52, visits:610, posts:14},
+    {m:'Jun', followers:6020, reach:24800, likes:1180, comments:88, saves:225, shares:58, visits:670, posts:13},
+  ],
+};
+
+function interactions(row){ return row.likes + row.comments + row.saves + row.shares; }
+function engagementRate(row){ return row.reach ? (interactions(row)/row.reach*100) : 0; }
+function delta(curr, prev){ if(!prev) return null; return ((curr-prev)/prev*100); }
+function fmtDelta(d){
+  if(d===null) return '';
+  const sign = d>=0 ? '▲' : '▼';
+  const cls = d>=0 ? 'up' : 'down';
+  return `<span class="kpi-delta ${cls}">${sign} ${Math.abs(d).toFixed(0)}%</span>`;
+}
+function fmtNum(n){ return n.toLocaleString('pt-BR'); }
+
+
+let currentTab = 'clientes';
+let selectedClient = clients[0].id;
+let calCursor = { y: 2026, m: 6 };
+
+const TABS = [
+  {key:'clientes', label:'Clientes'}, {key:'processo', label:'Processo do mês'},
+  {key:'demandas', label:'Demandas'}, {key:'pauta', label:'Pauta do dia'},
+  {key:'calendario', label:'Calendário'}, {key:'equipe', label:'Equipe'}
+];
+
+function esc(s){ return (s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+function renderTabs(){
+  document.getElementById('tabs').innerHTML = TABS.map(t =>
+    `<button class="tab-btn ${currentTab===t.key?'active':''}" data-tab="${t.key}">${t.label}</button>`
+  ).join('');
+  document.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => { currentTab = b.dataset.tab; render(); }));
+}
+
+function lineChart(data, key, color, label, fmt){
+  const w = 300, h = 110, pad = 24;
+  const vals = data.map(d => typeof key === 'function' ? key(d) : d[key]);
+  const maxV = Math.max(...vals) * 1.15 || 1;
+  const minV = Math.min(0, Math.min(...vals));
+  const xStep = (w - pad*2) / (data.length - 1);
+  const pts = vals.map((v,i) => [pad + i*xStep, h - pad - ((v-minV)/(maxV-minV||1))*(h-pad*2)]);
+  const path = pts.map((p,i) => (i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+  const dots = pts.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="2.6" fill="${color}"/>`).join('');
+  const labels = data.map((d,i) => `<text x="${pad+i*xStep}" y="${h-4}" font-size="8" fill="var(--ink-soft)" text-anchor="middle" font-family="IBM Plex Mono">${d.m}</text>`).join('');
+  const lastVal = fmt ? fmt(vals[vals.length-1]) : vals[vals.length-1];
+  return `
+    <div class="mini-chart">
+      <div class="mini-chart-head"><span>${label}</span><strong style="color:${color}">${lastVal}</strong></div>
+      <svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;">
+        <path d="${path}" fill="none" stroke="${color}" stroke-width="2"/>
+        ${dots}${labels}
+      </svg>
+    </div>`;
+}
+
+
+function renderInsights(hist){
+  const last = hist[hist.length-1];
+  const prev = hist[hist.length-2];
+  const eLast = engagementRate(last);
+  const ePrev = prev ? engagementRate(prev) : null;
+
+  const kpis = [
+    { label:'Seguidores', val: fmtNum(last.followers), d: prev ? delta(last.followers, prev.followers) : null },
+    { label:'Alcance', val: fmtNum(last.reach), d: prev ? delta(last.reach, prev.reach) : null },
+    { label:'Interações', val: fmtNum(interactions(last)), d: prev ? delta(interactions(last), interactions(prev)) : null },
+    { label:'Engajamento', val: eLast.toFixed(1)+'%', d: ePrev ? delta(eLast, ePrev) : null },
+    { label:'Visitas ao perfil', val: fmtNum(last.visits), d: prev ? delta(last.visits, prev.visits) : null },
+    { label:'Posts no mês', val: last.posts, d: prev ? delta(last.posts, prev.posts) : null },
+  ];
+
+  return `
+    <div class="kpi-grid">
+      ${kpis.map(k => `
+        <div class="kpi-card">
+          <div class="kpi-label">${k.label}</div>
+          <div class="kpi-value">${k.val}</div>
+          ${fmtDelta(k.d)}
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="mini-chart-row">
+      ${lineChart(hist, 'followers', '#4A382D', 'Seguidores')}
+      ${lineChart(hist, 'reach', '#3E6B7A', 'Alcance')}
+      ${lineChart(hist, engagementRate, '#550B18', 'Engajamento %', v => v.toFixed(1)+'%')}
+    </div>
+
+    <div style="overflow-x:auto;">
+    <table class="metrics-table">
+      <thead><tr><th>Mês</th><th>Seguidores</th><th>Alcance</th><th>Curtidas</th><th>Coment.</th><th>Salvos</th><th>Compart.</th><th>Visitas</th><th>Posts</th><th>Engaj.</th></tr></thead>
+      <tbody>
+        ${hist.map(h => `<tr>
+          <td>${h.m}</td><td>${fmtNum(h.followers)}</td><td>${fmtNum(h.reach)}</td>
+          <td>${h.likes}</td><td>${h.comments}</td><td>${h.saves}</td><td>${h.shares}</td>
+          <td>${h.visits}</td><td>${h.posts}</td><td>${engagementRate(h).toFixed(1)}%</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    </div>
+  `;
+}
+
+function renderClientes(){
+  const c = clients.find(x=>x.id===selectedClient);
+  const hist = metricsHistory[c.id];
+  return `
+    <div class="shell">
+      <aside class="sidebar">
+        <p class="side-eyebrow">Clientes (${clients.length})</p>
+        ${clients.map(cl => `<div class="client-item ${cl.id===selectedClient?'active':''}" data-selectclient="${cl.id}">${esc(cl.name)}</div>`).join('')}
+      </aside>
+      <main class="main">
+        <div class="detail-title">${esc(c.name)}</div>
+
+        <p class="section-title" style="margin-top:.8rem;">Status do cliente</p>
+        <div class="stage-pills">
+          ${MSTAGES.map(s => `<button class="stage-pill ${c.stage===s.key?'sel':''}" data-setstage="${s.key}" data-client="${c.id}" style="${c.stage===s.key?'background:'+s.color+';border-color:'+s.color+';color:#fff;':''}">${s.label}</button>`).join('')}
+        </div>
+        <p class="empty-note" style="margin-top:.3rem;">Isso é o mesmo status do quadro "Processo do mês" — muda aqui ou lá, sincroniza dos dois lados.</p>
+
+        <p class="section-title">Acessos</p>
+        <div class="link-grid">
+          ${c.drive ? `<div class="link-card"><div class="link-label">Drive</div><div class="link-value">${esc(c.drive)}</div></div>` : `<div class="link-card"><div class="link-label">Drive</div><div class="link-value" style="color:var(--ink-soft)">Não adicionado</div></div>`}
+          ${c.docs ? `<div class="link-card"><div class="link-label">Docs</div><div class="link-value">${esc(c.docs)}</div></div>` : `<div class="link-card"><div class="link-label">Docs</div><div class="link-value" style="color:var(--ink-soft)">Não adicionado</div></div>`}
+          ${c.instagram ? `<div class="link-card"><div class="link-label">Instagram</div><div class="link-value">${esc(c.instagram)}</div></div>` : `<div class="link-card"><div class="link-label">Instagram</div><div class="link-value" style="color:var(--ink-soft)">Não adicionado</div></div>`}
+        </div>
+
+        <p class="section-title">Demandas deste cliente</p>
+        ${renderClientDemands(c)}
+
+        <p class="section-title">Insights do Instagram</p>
+        ${hist ? renderInsights(hist) : `<p style="color:var(--ink-soft);font-size:12.5px;">Nenhum mês registrado ainda pra este cliente de exemplo.</p>`}
+      </main>
+    </div>
+  `;
+}
+
+function renderClientDemands(c){
+  const items = demands.filter(d => d.client === c.name);
+  const rows = items.map(d => `
+    <div class="item-row">
+      <input type="checkbox" ${d.done?'checked':''} data-toggledone="${d.id}">
+      <span style="flex:1;${d.done?'text-decoration:line-through;color:var(--ink-soft);':''}">${esc(d.title)}</span>
+      <span class="status-badge ${status(d)}">${STATUS_LABEL[status(d)]}</span>
+      ${d.respId ? `<span class="item-responsible">${team.find(t=>t.id===d.respId).name}</span>` : ''}
+      ${d.deadline ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--vinho);">${new Date(d.deadline+'T00:00:00').toLocaleDateString('pt-BR')}</span>` : ''}
+      ${(d.respId && !d.done) ? `<button class="btn" style="padding:.3rem .5rem;font-size:9px;">✉ Notificar</button>` : ''}
+    </div>
+  `).join('');
+  return `
+    <div style="margin-bottom:.8rem;">${rows || '<p class="empty-note">Nenhuma demanda registrada pra este cliente ainda.</p>'}</div>
+    <div class="add-item-row">
+      <input type="text" id="newDemandTitle" placeholder="Ex.: Vídeos liberados para edição" style="flex:1;min-width:160px;font-family:'DM Sans',sans-serif;font-size:12.5px;border:1px solid var(--line);border-radius:3px;padding:.5rem .7rem;">
+      <select id="newDemandResp" style="font-family:'DM Sans',sans-serif;font-size:12.5px;border:1px solid var(--line);border-radius:3px;padding:.5rem .5rem;">
+        <option value="">Sem responsável</option>
+        ${team.map(t=>`<option value="${t.id}">${t.name}</option>`).join('')}
+      </select>
+      <input type="date" id="newDemandDate" style="font-family:'DM Sans',sans-serif;font-size:12.5px;border:1px solid var(--line);border-radius:3px;padding:.5rem .5rem;">
+      <button class="btn" id="addDemandBtn" data-client="${c.id}">Adicionar</button>
+    </div>
+  `;
+}
+
+
+function renderProcesso(){
+  return `
+    <div class="main">
+      <p class="section-title" style="margin-top:0;">Agendamento → Reunião & Planejamento → Produção → Postagem → Análise do mês</p>
+      <div class="board">
+        ${MSTAGES.map(stage => `
+          <div class="board-col">
+            <p class="board-col-title">${stage.label}</p>
+            ${clients.filter(c=>c.stage===stage.key).map(c => `
+              <div class="board-card">
+                <div class="board-card-name">${esc(c.name)}</div>
+                <div class="board-card-actions"><button data-move="-1" data-client="${c.id}">←</button><button data-move="1" data-client="${c.id}">→</button></div>
+              </div>
+            `).join('')}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderDemandas(){
+  return `
+    <div class="main">
+      <div class="board demandas">
+        ${DSTAGES.map(stage => `
+          <div class="board-col">
+            <p class="board-col-title">${stage.label}</p>
+            ${demands.filter(d=>d.stage===stage.key).map(d => `
+              <div class="board-card">
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--vinho);text-transform:uppercase;">${esc(d.client)}</div>
+                <div class="board-card-name">${esc(d.title)}</div>
+                ${d.respId ? `<span class="item-responsible">${team.find(t=>t.id===d.respId).name}</span>` : ''}
+                <div class="board-card-actions"><button>✉ Notificar</button></div>
+              </div>
+            `).join('')}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function status(d){
+  if(d.done) return 'concluido';
+  if(d.deadline < '2026-07-07') return 'atrasado';
+  return 'afazer';
+}
+const STATUS_LABEL = {afazer:'A fazer', atrasado:'Atrasado', concluido:'Concluído'};
+
+function renderPauta(){
+  const byClient = {};
+  demands.filter(d=>!d.done).forEach(d => { (byClient[d.client] = byClient[d.client]||[]).push(d); });
+  return `
+    <div class="main">
+      ${Object.entries(byClient).map(([client, items]) => `
+        <div class="pauta-client">
+          <div class="pauta-client-name">${esc(client)}</div>
+          ${items.map(d => `
+            <div class="pauta-item">
+              <span class="status-badge ${status(d)}">${STATUS_LABEL[status(d)]}</span>
+              <span>${esc(d.title)}${d.respId ? ' — <span class="item-responsible">'+team.find(t=>t.id===d.respId).name+'</span>' : ''} — <strong>${new Date(d.deadline+'T00:00:00').toLocaleDateString('pt-BR')}</strong></span>
+            </div>
+          `).join('')}
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderCalendario(){
+  const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const first = new Date(calCursor.y, calCursor.m, 1);
+  const startDay = first.getDay();
+  const daysInMonth = new Date(calCursor.y, calCursor.m+1, 0).getDate();
+  const cells = [];
+  for(let i=0;i<startDay;i++) cells.push(null);
+  for(let d=1;d<=daysInMonth;d++) cells.push(d);
+  const toStr = d => `${calCursor.y}-${String(calCursor.m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  return `
+    <div class="main">
+      <div class="detail-title">${MONTHS[calCursor.m]} ${calCursor.y}</div>
+      <div class="calendar-grid">
+        ${['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(w=>`<div class="calendar-weekday">${w}</div>`).join('')}
+      </div>
+      <div class="calendar-grid">
+        ${cells.map(d => {
+          if(d===null) return `<div class="calendar-cell empty"></div>`;
+          const ds = toStr(d);
+          const items = demands.filter(x=>x.deadline===ds);
+          const overdue = items.some(x=>!x.done && ds < '2026-07-07');
+          return `<div class="calendar-cell">${d}${items.length ? `<div class="calendar-badge ${overdue?'overdue':''}">${items.length}</div>` : ''}</div>`;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderEquipe(){
+  return `
+    <div class="main">
+      ${team.map(t => `<div class="team-row"><span>${esc(t.name)}</span><span>${esc(t.area)}</span><span>${esc(t.email)}</span></div>`).join('')}
+    </div>
+  `;
+}
+
+function render(){
+  renderTabs();
+  const app = document.getElementById('app');
+  if(currentTab==='clientes') app.innerHTML = renderClientes();
+  if(currentTab==='processo') app.innerHTML = renderProcesso();
+  if(currentTab==='demandas') app.innerHTML = renderDemandas();
+  if(currentTab==='pauta') app.innerHTML = renderPauta();
+  if(currentTab==='calendario') app.innerHTML = renderCalendario();
+  if(currentTab==='equipe') app.innerHTML = renderEquipe();
+
+  document.querySelectorAll('[data-selectclient]').forEach(el => {
+    el.addEventListener('click', () => { selectedClient = el.dataset.selectclient; render(); });
+  });
+  document.querySelectorAll('[data-move]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const c = clients.find(x=>x.id===btn.dataset.client);
+      const idx = MSTAGES.findIndex(s=>s.key===c.stage);
+      const next = (idx + parseInt(btn.dataset.move,10) + MSTAGES.length) % MSTAGES.length;
+      c.stage = MSTAGES[next].key;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-setstage]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const c = clients.find(x=>x.id===btn.dataset.client);
+      c.stage = btn.dataset.setstage;
+      render();
+    });
+  });
+  document.querySelectorAll('[data-toggledone]').forEach(cb => {
+    cb.addEventListener('change', (e) => {
+      const d = demands.find(x=>x.id===cb.dataset.toggledone);
+      d.done = e.target.checked;
+      render();
+    });
+  });
+  const addBtn = document.getElementById('addDemandBtn');
+  if(addBtn){
+    addBtn.addEventListener('click', () => {
+      const c = clients.find(x=>x.id===addBtn.dataset.client);
+      const title = document.getElementById('newDemandTitle').value.trim();
+      if(!title) return;
+      const respId = document.getElementById('newDemandResp').value;
+      const deadline = document.getElementById('newDemandDate').value;
+      demands.push({ id:'d'+Date.now(), client:c.name, title, respId, stage:'pauta', deadline, done:false });
+      render();
+    });
+  }
+}
+
+render();
+</script>
+</body>
+</html>
