@@ -399,6 +399,7 @@ export default function Dashboard() {
           team={data.team}
         />
       ) : null}
+      {currentTab === "historico" && isAdmin ? <Historico demands={data.demands} /> : null}
     </>
   );
 }
@@ -721,7 +722,21 @@ function DemandRow({ demand, onArchiveDemand, onNotifyDemand, onToggleDone, onUp
 
 function Pauta({ demands, teamById }) {
   const today = todayString();
-  const grouped = activeDemands(demands).filter((demand) => !demand.done && demand.deadline === today).reduce((acc, demand) => {
+  const openDemands = activeDemands(demands).filter((demand) => !demand.done);
+  const overdue = openDemands.filter((demand) => demand.deadline && demand.deadline < today);
+  const dueToday = openDemands.filter((demand) => demand.deadline === today);
+
+  return (
+    <main className="main">
+      <h1 className="detail-title">Pauta do dia</h1>
+      <PautaGroup emptyText="Nenhuma pauta atrasada." title="Atrasadas" demands={overdue} teamById={teamById} />
+      <PautaGroup emptyText="Nenhuma pauta para hoje." title="Hoje" demands={dueToday} teamById={teamById} />
+    </main>
+  );
+}
+
+function PautaGroup({ demands, emptyText, teamById, title }) {
+  const grouped = demands.reduce((acc, demand) => {
     acc[demand.client] = acc[demand.client] || [];
     acc[demand.client].push(demand);
     return acc;
@@ -729,8 +744,8 @@ function Pauta({ demands, teamById }) {
   const entries = Object.entries(grouped);
 
   return (
-    <main className="main">
-      <h1 className="detail-title">Pauta do dia</h1>
+    <section className="pauta-section">
+      <p className="section-title">{title} ({demands.length})</p>
       {entries.length ? (
         entries.map(([client, items]) => (
           <div className="pauta-client" key={client}>
@@ -741,15 +756,16 @@ function Pauta({ demands, teamById }) {
                 <span>
                   {demand.title}
                   {demand.respId ? <> - <span className="item-responsible">{teamById.get(demand.respId)?.name}</span></> : null}
+                  {demand.deadline ? <> - <strong>{formatDate(demand.deadline)}</strong></> : null}
                 </span>
               </div>
             ))}
           </div>
         ))
       ) : (
-        <p className="empty-note">Nenhuma demanda aberta para hoje.</p>
+        <p className="empty-note">{emptyText}</p>
       )}
-    </main>
+    </section>
   );
 }
 
@@ -797,6 +813,50 @@ function Calendario({ calCursor, demands, onMoveMonth }) {
           );
         })}
       </div>
+    </main>
+  );
+}
+
+function Historico({ demands }) {
+  const grouped = groupDemandHistory(demands);
+  const clients = Object.entries(grouped);
+
+  return (
+    <main className="main">
+      <h1 className="detail-title">Histórico</h1>
+      {clients.length ? (
+        clients.map(([client, clientDemands]) => (
+          <section className="history-client" key={client}>
+            <p className="section-title">{client}</p>
+            {clientDemands.map((demand) => (
+              <div className="history-demand" key={demand.id}>
+                <div className="history-demand-head">
+                  <strong>{demand.title}</strong>
+                  {demand.archivedAt ? <span className="status-badge atrasado">Arquivada</span> : null}
+                </div>
+                {demand.history?.length ? (
+                  <div className="history-list">
+                    {[...demand.history].reverse().map((entry, index) => (
+                      <div className="history-entry" key={`${demand.id}-${index}`}>
+                        <div className="history-entry-meta">
+                          <span>{historyActionLabel(entry.action)}</span>
+                          <span>{entry.at ? formatDateTime(entry.at) : "Sem data"}</span>
+                          {entry.by?.name ? <span>{entry.by.name}</span> : null}
+                        </div>
+                        {entry.changes ? <p>{describeHistoryChanges(entry.changes)}</p> : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="empty-note">Nenhuma mudança registrada para esta demanda.</p>
+                )}
+              </div>
+            ))}
+          </section>
+        ))
+      ) : (
+        <p className="empty-note">Nenhum histórico de demanda registrado ainda.</p>
+      )}
     </main>
   );
 }
@@ -1032,6 +1092,10 @@ function formatDate(value) {
   return new Date(`${value}T00:00:00`).toLocaleDateString("pt-BR");
 }
 
+function formatDateTime(value) {
+  return new Date(value).toLocaleString("pt-BR");
+}
+
 function groupOpenDemandsByDate(demands) {
   return demands
     .filter((demand) => !demand.done)
@@ -1051,6 +1115,52 @@ function groupOpenDemandsByDate(demands) {
 
 function activeDemands(demands) {
   return demands.filter((demand) => !demand.archivedAt);
+}
+
+function groupDemandHistory(demands) {
+  return [...demands]
+    .filter((demand) => demand.history?.length)
+    .sort((a, b) => (a.client || "").localeCompare(b.client || "", "pt-BR") || (a.title || "").localeCompare(b.title || "", "pt-BR"))
+    .reduce((acc, demand) => {
+      const client = demand.client || "Sem cliente";
+      acc[client] = acc[client] || [];
+      acc[client].push(demand);
+      return acc;
+    }, {});
+}
+
+function historyActionLabel(action) {
+  const labels = {
+    created: "Criada",
+    updated: "Atualizada",
+    archived: "Arquivada"
+  };
+
+  return labels[action] || action || "Alteração";
+}
+
+function describeHistoryChanges(changes) {
+  return Object.entries(changes)
+    .map(([field, change]) => `${fieldLabel(field)}: "${formatHistoryValue(change.from)}" para "${formatHistoryValue(change.to)}"`)
+    .join("; ");
+}
+
+function fieldLabel(field) {
+  const labels = {
+    deadline: "Prazo",
+    done: "Concluída",
+    respId: "Responsável",
+    stage: "Etapa",
+    title: "Título"
+  };
+
+  return labels[field] || field;
+}
+
+function formatHistoryValue(value) {
+  if (value === true) return "sim";
+  if (value === false) return "não";
+  return value || "vazio";
 }
 
 function sortTeam(team) {

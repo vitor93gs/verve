@@ -376,6 +376,58 @@ select {
   margin-top: 0.4rem;
 }
 
+.pauta-section {
+  margin-top: 1rem;
+}
+
+.history-client {
+  margin-top: 1rem;
+}
+
+.history-demand {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  margin-bottom: 0.7rem;
+  padding: 0.75rem 0.85rem;
+}
+
+.history-demand-head,
+.history-entry-meta {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.history-demand-head {
+  justify-content: space-between;
+}
+
+.history-list {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.65rem;
+}
+
+.history-entry {
+  border-top: 1px solid var(--line);
+  padding-top: 0.55rem;
+}
+
+.history-entry-meta {
+  color: var(--ink-soft);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.history-entry p {
+  font-size: 12.5px;
+  margin-top: 0.25rem;
+}
+
 .team-row {
   display: grid;
   font-size: 12.5px;

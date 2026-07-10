@@ -10,12 +10,13 @@ export async function GET() {
 
   try {
     const data = await getDashboardData();
+    const session = getSession();
     return NextResponse.json({
       ...data,
-      currentUser: getSession(),
+      currentUser: session,
       demandStages,
       monthlyStages,
-      tabs
+      tabs: tabs.filter((tab) => !tab.adminOnly || session?.role === "admin")
     });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
