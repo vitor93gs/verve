@@ -110,6 +110,39 @@ export default function Dashboard() {
     setData((prev) => ({ ...prev, demands: [...prev.demands, created] }));
   }
 
+  async function updateDemand(demandId, formData) {
+    const title = formData.get("title")?.trim();
+    if (!title) return false;
+
+    await patchDemand(demandId, {
+      title,
+      respId: formData.get("respId"),
+      deadline: formData.get("deadline")
+    });
+    return true;
+  }
+
+  async function archiveDemand(demand) {
+    const confirmed = window.confirm(`Arquivar a demanda "${demand.title}"? O histórico será mantido.`);
+    if (!confirmed) return;
+
+    setSaving(demand.id, true);
+
+    try {
+      const response = await fetch(`/api/demands/${demand.id}`, { method: "DELETE" });
+      const archived = await response.json();
+      if (!response.ok) throw new Error(archived.error || "Erro ao arquivar demanda.");
+      setData((prev) => ({
+        ...prev,
+        demands: prev.demands.map((item) => (item.id === demand.id ? archived : item))
+      }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(demand.id, false);
+    }
+  }
+
   async function addClient(formData) {
     const name = formData.get("name")?.trim();
     if (!name) return;
@@ -234,6 +267,22 @@ export default function Dashboard() {
     setData((prev) => ({ ...prev, team: prev.team.filter((item) => item.id !== member.id) }));
   }
 
+  async function notifyDemand(demand) {
+    const savingKey = `notify:${demand.id}`;
+    setSaving(savingKey, true);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/demands/${demand.id}/notify`, { method: "POST" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Erro ao enviar notificação.");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(savingKey, false);
+    }
+  }
+
   function moveClient(client, direction) {
     const stages = data.monthlyStages;
     const index = stages.findIndex((stage) => stage.key === client.stage);
@@ -303,27 +352,40 @@ export default function Dashboard() {
           client={selected}
           clients={data.clients}
           demands={data.demands}
+          isAdmin={isAdmin}
           metricsHistory={data.metricsHistory}
           monthlyStages={data.monthlyStages}
           onAddClient={addClient}
           onAddDemand={addDemand}
+          onArchiveDemand={archiveDemand}
+          onNotifyDemand={notifyDemand}
           onRemoveClient={removeClient}
           onSelectClient={setSelectedClient}
           onSetStage={patchClientStage}
           onToggleDone={(demand, done) => patchDemand(demand.id, { done })}
+          onUpdateDemand={updateDemand}
+          savingIds={savingIds}
           selectedClient={selected.id}
           team={data.team}
           teamById={teamById}
         />
       ) : null}
       {currentTab === "clientes" && !selected ? (
-        <ClientesEmpty onAddClient={addClient} />
+        <ClientesEmpty isAdmin={isAdmin} onAddClient={addClient} />
       ) : null}
       {currentTab === "processo" ? (
         <Processo clients={data.clients} monthlyStages={data.monthlyStages} moveClient={moveClient} savingIds={savingIds} />
       ) : null}
       {currentTab === "demandas" ? (
-        <Demandas demands={data.demands} onToggleDone={(demand, done) => patchDemand(demand.id, { done })} teamById={teamById} />
+        <Demandas
+          demands={data.demands}
+          onArchiveDemand={archiveDemand}
+          onNotifyDemand={notifyDemand}
+          onToggleDone={(demand, done) => patchDemand(demand.id, { done })}
+          onUpdateDemand={updateDemand}
+          savingIds={savingIds}
+          teamById={teamById}
+        />
       ) : null}
       {currentTab === "pauta" ? <Pauta demands={data.demands} teamById={teamById} /> : null}
       {currentTab === "calendario" ? <Calendario calCursor={calCursor} demands={data.demands} onMoveMonth={moveCalendar} /> : null}
@@ -346,14 +408,19 @@ function Clientes(props) {
     client,
     clients,
     demands,
+    isAdmin,
     metricsHistory,
     monthlyStages,
     onAddClient,
     onAddDemand,
+    onArchiveDemand,
+    onNotifyDemand,
     onRemoveClient,
     onSelectClient,
     onSetStage,
     onToggleDone,
+    onUpdateDemand,
+    savingIds,
     selectedClient,
     team,
     teamById
@@ -364,7 +431,7 @@ function Clientes(props) {
     <div className="shell">
       <aside className="sidebar">
         <p className="side-eyebrow">Clientes ({clients.length})</p>
-        <AddClientForm onAddClient={onAddClient} />
+        {isAdmin ? <AddClientForm onAddClient={onAddClient} /> : null}
         {clients.map((item) => (
           <div
             className={`client-item ${item.id === selectedClient ? "active" : ""}`}
@@ -380,9 +447,11 @@ function Clientes(props) {
       <main className="main">
         <div className="detail-head">
           <h1 className="detail-title">{client.name}</h1>
-          <button className="btn danger-btn" onClick={() => onRemoveClient(client)} type="button">
-            Remover cliente
-          </button>
+          {isAdmin ? (
+            <button className="btn danger-btn" onClick={() => onRemoveClient(client)} type="button">
+              Remover cliente
+            </button>
+          ) : null}
         </div>
 
         <p className="section-title">Status do cliente</p>
@@ -411,9 +480,13 @@ function Clientes(props) {
         <p className="section-title">Demandas deste cliente</p>
         <ClientDemands
           client={client}
-          demands={demands.filter((demand) => demand.clientId === client.id || demand.client === client.name)}
+          demands={activeDemands(demands).filter((demand) => demand.clientId === client.id || demand.client === client.name)}
           onAddDemand={onAddDemand}
+          onArchiveDemand={onArchiveDemand}
+          onNotifyDemand={onNotifyDemand}
           onToggleDone={onToggleDone}
+          onUpdateDemand={onUpdateDemand}
+          savingIds={savingIds}
           team={team}
           teamById={teamById}
         />
@@ -425,15 +498,17 @@ function Clientes(props) {
   );
 }
 
-function ClientesEmpty({ onAddClient }) {
+function ClientesEmpty({ isAdmin, onAddClient }) {
   return (
     <div className="shell">
       <aside className="sidebar">
         <p className="side-eyebrow">Clientes (0)</p>
-        <AddClientForm onAddClient={onAddClient} />
+        {isAdmin ? <AddClientForm onAddClient={onAddClient} /> : null}
       </aside>
       <main className="main">
-        <p className="empty-note">Nenhum cliente cadastrado ainda.</p>
+        <p className="empty-note">
+          {isAdmin ? "Nenhum cliente cadastrado ainda." : "Nenhum cliente cadastrado ainda. Peça a um admin para adicionar clientes."}
+        </p>
       </main>
     </div>
   );
@@ -469,7 +544,7 @@ function LinkCard({ label, value }) {
   );
 }
 
-function ClientDemands({ client, demands, onAddDemand, onToggleDone, team, teamById }) {
+function ClientDemands({ client, demands, onAddDemand, onArchiveDemand, onNotifyDemand, onToggleDone, onUpdateDemand, savingIds, team, teamById }) {
   function handleSubmit(event) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -482,16 +557,17 @@ function ClientDemands({ client, demands, onAddDemand, onToggleDone, team, teamB
       <div>
         {demands.length ? (
           demands.map((demand) => (
-            <div className="item-row" key={demand.id}>
-              <input checked={demand.done} onChange={(event) => onToggleDone(demand, event.target.checked)} type="checkbox" />
-              <span style={demand.done ? { color: "var(--ink-soft)", flex: 1, textDecoration: "line-through" } : { flex: 1 }}>
-                {demand.title}
-              </span>
-              <StatusBadge demand={demand} />
-              {demand.respId ? <span className="item-responsible">{teamById.get(demand.respId)?.name}</span> : null}
-              {demand.deadline ? <span style={{ color: "var(--vinho)", fontFamily: "IBM Plex Mono", fontSize: 10 }}>{formatDate(demand.deadline)}</span> : null}
-              {demand.respId && !demand.done ? <button className="btn" type="button">Notificar</button> : null}
-            </div>
+            <DemandRow
+              demand={demand}
+              key={demand.id}
+              onArchiveDemand={onArchiveDemand}
+              onNotifyDemand={onNotifyDemand}
+              onToggleDone={onToggleDone}
+              onUpdateDemand={onUpdateDemand}
+              savingIds={savingIds}
+              team={team}
+              teamById={teamById}
+            />
           ))
         ) : (
           <p className="empty-note">Nenhuma demanda registrada para este cliente ainda.</p>
@@ -542,47 +618,53 @@ function Processo({ clients, monthlyStages, moveClient, savingIds }) {
   );
 }
 
-function Demandas({ demands, onToggleDone, teamById }) {
-  const today = todayString();
-  const dueToday = demands.filter((demand) => !demand.done && demand.deadline === today);
-  const overdue = demands.filter((demand) => !demand.done && demand.deadline && demand.deadline < today);
+function Demandas({ demands, onArchiveDemand, onNotifyDemand, onToggleDone, onUpdateDemand, savingIds, teamById }) {
+  const grouped = groupOpenDemandsByDate(activeDemands(demands));
+  const entries = Object.entries(grouped);
 
   return (
     <main className="main">
       <h1 className="detail-title">Demandas</h1>
-      <DemandList
-        demands={dueToday}
-        emptyText="Nenhuma demanda para entregar hoje."
-        onToggleDone={onToggleDone}
-        teamById={teamById}
-        title="Para entregar hoje"
-      />
-      <DemandList
-        demands={overdue}
-        emptyText="Nenhuma demanda atrasada."
-        onToggleDone={onToggleDone}
-        teamById={teamById}
-        title="Atrasadas"
-      />
+      {entries.length ? (
+        entries.map(([date, items]) => (
+          <DemandList
+            demands={items}
+            emptyText=""
+            onArchiveDemand={onArchiveDemand}
+            key={date}
+            onNotifyDemand={onNotifyDemand}
+            onToggleDone={onToggleDone}
+            onUpdateDemand={onUpdateDemand}
+            savingIds={savingIds}
+            team={Array.from(teamById.values())}
+            teamById={teamById}
+            title={date === "sem-prazo" ? "Sem prazo" : formatDate(date)}
+          />
+        ))
+      ) : (
+        <p className="empty-note">Nenhuma demanda em aberto.</p>
+      )}
     </main>
   );
 }
 
-function DemandList({ demands, emptyText, onToggleDone, teamById, title }) {
+function DemandList({ demands, emptyText, onArchiveDemand, onNotifyDemand, onToggleDone, onUpdateDemand, savingIds, team, teamById, title }) {
   return (
     <section className="demand-section">
       <p className="section-title">{title} ({demands.length})</p>
       {demands.length ? (
         demands.map((demand) => (
-          <div className="item-row" key={demand.id}>
-            <input checked={demand.done} onChange={(event) => onToggleDone(demand, event.target.checked)} type="checkbox" />
-            <span style={{ flex: 1 }}>
-              <strong>{demand.client}</strong> - {demand.title}
-            </span>
-            <StatusBadge demand={demand} />
-            {demand.respId ? <span className="item-responsible">{teamById.get(demand.respId)?.name}</span> : null}
-            {demand.deadline ? <span style={{ color: "var(--vinho)", fontFamily: "IBM Plex Mono", fontSize: 10 }}>{formatDate(demand.deadline)}</span> : null}
-          </div>
+          <DemandRow
+            demand={demand}
+            key={demand.id}
+            onArchiveDemand={onArchiveDemand}
+            onNotifyDemand={onNotifyDemand}
+            onToggleDone={onToggleDone}
+            onUpdateDemand={onUpdateDemand}
+            savingIds={savingIds}
+            team={team}
+            teamById={teamById}
+          />
         ))
       ) : (
         <p className="empty-note">{emptyText}</p>
@@ -591,30 +673,82 @@ function DemandList({ demands, emptyText, onToggleDone, teamById, title }) {
   );
 }
 
+function DemandRow({ demand, onArchiveDemand, onNotifyDemand, onToggleDone, onUpdateDemand, savingIds, team, teamById }) {
+  const [editing, setEditing] = useState(false);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    const ok = await onUpdateDemand(demand.id, new FormData(event.currentTarget));
+    if (ok) setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <form className="demand-edit-row" onSubmit={handleSubmit}>
+        <input className="form-input grow" defaultValue={demand.title} name="title" placeholder="Título da demanda" />
+        <select className="form-input" defaultValue={demand.respId || ""} name="respId">
+          <option value="">Sem responsável</option>
+          {team.map((member) => (
+            <option key={member.id} value={member.id}>{member.name}</option>
+          ))}
+        </select>
+        <input className="form-input" defaultValue={demand.deadline || ""} name="deadline" type="date" />
+        <button className="btn" disabled={savingIds.has(demand.id)} type="submit">Salvar</button>
+        <button className="btn" onClick={() => setEditing(false)} type="button">Cancelar</button>
+      </form>
+    );
+  }
+
+  return (
+    <div className="item-row">
+      <input checked={demand.done} onChange={(event) => onToggleDone(demand, event.target.checked)} type="checkbox" />
+      <span style={demand.done ? { color: "var(--ink-soft)", flex: 1, textDecoration: "line-through" } : { flex: 1 }}>
+        <strong>{demand.client}</strong> - {demand.title}
+      </span>
+      <StatusBadge demand={demand} />
+      {demand.respId ? <span className="item-responsible">{teamById.get(demand.respId)?.name}</span> : null}
+      {demand.deadline ? <span style={{ color: "var(--vinho)", fontFamily: "IBM Plex Mono", fontSize: 10 }}>{formatDate(demand.deadline)}</span> : null}
+      {demand.respId && !demand.done ? (
+        <button className="btn" disabled={savingIds.has(`notify:${demand.id}`)} onClick={() => onNotifyDemand(demand)} type="button">
+          {savingIds.has(`notify:${demand.id}`) ? "Enviando..." : "Notificar"}
+        </button>
+      ) : null}
+      <button className="btn" onClick={() => setEditing(true)} type="button">Editar</button>
+      <button className="btn danger-btn" disabled={savingIds.has(demand.id)} onClick={() => onArchiveDemand(demand)} type="button">Deletar</button>
+    </div>
+  );
+}
+
 function Pauta({ demands, teamById }) {
-  const grouped = demands.filter((demand) => !demand.done).reduce((acc, demand) => {
+  const today = todayString();
+  const grouped = activeDemands(demands).filter((demand) => !demand.done && demand.deadline === today).reduce((acc, demand) => {
     acc[demand.client] = acc[demand.client] || [];
     acc[demand.client].push(demand);
     return acc;
   }, {});
+  const entries = Object.entries(grouped);
 
   return (
     <main className="main">
-      {Object.entries(grouped).map(([client, items]) => (
-        <div className="pauta-client" key={client}>
-          <div className="pauta-client-name">{client}</div>
-          {items.map((demand) => (
-            <div className="pauta-item" key={demand.id}>
-              <StatusBadge demand={demand} />
-              <span>
-                {demand.title}
-                {demand.respId ? <> - <span className="item-responsible">{teamById.get(demand.respId)?.name}</span></> : null}
-                {demand.deadline ? <> - <strong>{formatDate(demand.deadline)}</strong></> : null}
-              </span>
-            </div>
-          ))}
-        </div>
-      ))}
+      <h1 className="detail-title">Pauta do dia</h1>
+      {entries.length ? (
+        entries.map(([client, items]) => (
+          <div className="pauta-client" key={client}>
+            <div className="pauta-client-name">{client}</div>
+            {items.map((demand) => (
+              <div className="pauta-item" key={demand.id}>
+                <StatusBadge demand={demand} />
+                <span>
+                  {demand.title}
+                  {demand.respId ? <> - <span className="item-responsible">{teamById.get(demand.respId)?.name}</span></> : null}
+                </span>
+              </div>
+            ))}
+          </div>
+        ))
+      ) : (
+        <p className="empty-note">Nenhuma demanda aberta para hoje.</p>
+      )}
     </main>
   );
 }
@@ -640,7 +774,8 @@ function Calendario({ calCursor, demands, onMoveMonth }) {
         {cells.map((day, index) => {
           if (day === null) return <div className="calendar-cell empty" key={`empty-${index}`} />;
           const dateString = toDateString(day);
-          const items = demands.filter((demand) => demand.deadline === dateString);
+          const items = activeDemands(demands).filter((demand) => demand.deadline === dateString);
+          const orderedItems = [...items].sort((a, b) => Number(a.done) - Number(b.done));
           const overdue = items.some((demand) => !demand.done && isOverdue(dateString));
           return (
             <div className="calendar-cell" key={dateString}>
@@ -650,8 +785,8 @@ function Calendario({ calCursor, demands, onMoveMonth }) {
               </div>
               {items.length ? (
                 <div className="calendar-demand-list">
-                  {items.map((demand) => (
-                    <div className="calendar-demand" key={demand.id}>
+                  {orderedItems.map((demand) => (
+                    <div className={`calendar-demand ${demand.done ? "done" : ""}`} key={demand.id}>
                       <strong>{demand.client}</strong>
                       <span>{demand.title}</span>
                     </div>
@@ -895,6 +1030,27 @@ function formatNumber(value) {
 
 function formatDate(value) {
   return new Date(`${value}T00:00:00`).toLocaleDateString("pt-BR");
+}
+
+function groupOpenDemandsByDate(demands) {
+  return demands
+    .filter((demand) => !demand.done)
+    .sort((a, b) => {
+      if (!a.deadline && !b.deadline) return a.createdAt > b.createdAt ? 1 : -1;
+      if (!a.deadline) return 1;
+      if (!b.deadline) return -1;
+      return a.deadline.localeCompare(b.deadline);
+    })
+    .reduce((acc, demand) => {
+      const key = demand.deadline || "sem-prazo";
+      acc[key] = acc[key] || [];
+      acc[key].push(demand);
+      return acc;
+    }, {});
+}
+
+function activeDemands(demands) {
+  return demands.filter((demand) => !demand.archivedAt);
 }
 
 function sortTeam(team) {

@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
-import { isAuthenticated, unauthorized } from "@/lib/auth";
+import { requireAdmin, unauthorized } from "@/lib/auth";
 import { ensureSeeded } from "@/lib/data";
 import { getDb } from "@/lib/mongodb";
 
 export async function DELETE(request, { params }) {
-  if (!isAuthenticated()) {
+  const admin = await requireAdmin();
+
+  if (!admin) {
     return unauthorized();
   }
 

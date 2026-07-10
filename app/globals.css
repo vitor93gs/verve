@@ -251,6 +251,15 @@ select {
   padding: 0.5rem 0;
 }
 
+.demand-edit-row {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0.55rem 0;
+}
+
 .status-badge,
 .item-responsible {
   border-radius: 20px;
@@ -521,6 +530,17 @@ select {
   color: var(--marrom-deep);
   font-size: 9px;
   overflow-wrap: anywhere;
+}
+
+.calendar-demand.done {
+  background: rgba(74, 56, 45, 0.03);
+  opacity: 0.68;
+}
+
+.calendar-demand.done strong,
+.calendar-demand.done span {
+  color: var(--ink-soft);
+  text-decoration: line-through;
 }
 
 .metrics-table {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAuthenticated, unauthorized } from "@/lib/auth";
+import { getSession, isAuthenticated, unauthorized } from "@/lib/auth";
 import { ensureSeeded } from "@/lib/data";
 import { getDb } from "@/lib/mongodb";
 
@@ -35,7 +35,14 @@ export async function POST(request) {
       stage: "pauta",
       deadline: body.deadline || "",
       done: false,
-      createdAt: new Date()
+      createdAt: new Date(),
+      history: [
+        {
+          action: "created",
+          at: new Date(),
+          by: getSession()
+        }
+      ]
     };
 
     await db.collection("demands").insertOne(demand);
