@@ -29,6 +29,8 @@ export default function Dashboard() {
   }, []);
 
   const selected = data?.clients.find((client) => client.id === selectedClient) || data?.clients[0];
+  const currentUser = data?.currentUser;
+  const isAdmin = currentUser?.role === "admin";
   const teamById = useMemo(() => new Map((data?.team || []).map((member) => [member.id, member])), [data?.team]);
 
   async function patchClientStage(clientId, stage) {
@@ -164,6 +166,74 @@ export default function Dashboard() {
     }
   }
 
+  async function addTeamMember(formData) {
+    const payload = {
+      name: formData.get("name"),
+      area: formData.get("area"),
+      email: formData.get("email"),
+      role: formData.get("role"),
+      password: formData.get("password")
+    };
+
+    const response = await fetch("/api/team", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const created = await response.json();
+
+    if (!response.ok) {
+      setError(created.error || "Erro ao criar membro.");
+      return false;
+    }
+
+    setData((prev) => ({ ...prev, team: sortTeam([...prev.team, created]) }));
+    return true;
+  }
+
+  async function updateTeamMember(memberId, formData) {
+    const payload = {
+      name: formData.get("name"),
+      area: formData.get("area"),
+      email: formData.get("email"),
+      role: formData.get("role"),
+      password: formData.get("password")
+    };
+
+    const response = await fetch(`/api/team/${memberId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const updated = await response.json();
+
+    if (!response.ok) {
+      setError(updated.error || "Erro ao atualizar membro.");
+      return false;
+    }
+
+    setData((prev) => ({
+      ...prev,
+      team: sortTeam(prev.team.map((member) => (member.id === memberId ? updated : member)))
+    }));
+    return true;
+  }
+
+  async function removeTeamMember(member) {
+    const confirmed = window.confirm(`Remover ${member.name} da equipe?`);
+    if (!confirmed) return;
+
+    const response = await fetch(`/api/team/${member.id}`, { method: "DELETE" });
+    const payload = await response.json();
+
+    if (!response.ok) {
+      setError(payload.error || "Erro ao remover membro.");
+      return;
+    }
+
+    setData((prev) => ({ ...prev, team: prev.team.filter((item) => item.id !== member.id) }));
+  }
+
   function moveClient(client, direction) {
     const stages = data.monthlyStages;
     const index = stages.findIndex((stage) => stage.key === client.stage);
@@ -257,7 +327,16 @@ export default function Dashboard() {
       ) : null}
       {currentTab === "pauta" ? <Pauta demands={data.demands} teamById={teamById} /> : null}
       {currentTab === "calendario" ? <Calendario calCursor={calCursor} demands={data.demands} onMoveMonth={moveCalendar} /> : null}
-      {currentTab === "equipe" ? <Equipe team={data.team} /> : null}
+      {currentTab === "equipe" ? (
+        <Equipe
+          currentUser={currentUser}
+          isAdmin={isAdmin}
+          onAddMember={addTeamMember}
+          onRemoveMember={removeTeamMember}
+          onUpdateMember={updateTeamMember}
+          team={data.team}
+        />
+      ) : null}
     </>
   );
 }
@@ -587,17 +666,100 @@ function Calendario({ calCursor, demands, onMoveMonth }) {
   );
 }
 
-function Equipe({ team }) {
+function Equipe({ currentUser, isAdmin, onAddMember, onRemoveMember, onUpdateMember, team }) {
   return (
     <main className="main">
+      <div className="detail-head">
+        <h1 className="detail-title">Equipe</h1>
+        {currentUser ? <span className="item-responsible">{currentUser.role === "admin" ? "Admin" : "Membro"}</span> : null}
+      </div>
+      {isAdmin ? <TeamForm mode="create" onSubmit={onAddMember} /> : null}
       {team.map((member) => (
-        <div className="team-row" key={member.id}>
-          <span>{member.name}</span>
-          <span>{member.area}</span>
-          <span>{member.email}</span>
-        </div>
+        <TeamMemberRow
+          canEdit={isAdmin}
+          currentUser={currentUser}
+          key={member.id}
+          member={member}
+          onRemoveMember={onRemoveMember}
+          onUpdateMember={onUpdateMember}
+        />
       ))}
     </main>
+  );
+}
+
+function TeamForm({ member, mode, onCancel, onSubmit }) {
+  async function handleSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const ok = await onSubmit(new FormData(form));
+    if (ok && mode === "create") form.reset();
+    if (ok && onCancel) onCancel();
+  }
+
+  return (
+    <form className={`team-form ${mode === "create" ? "create" : ""}`} onSubmit={handleSubmit}>
+      <input className="form-input" defaultValue={member?.name || ""} name="name" placeholder="Nome" required />
+      <input className="form-input" defaultValue={member?.area || ""} name="area" placeholder="Área" />
+      <input className="form-input" defaultValue={member?.email || ""} name="email" placeholder="E-mail" required type="email" />
+      <select className="form-input" defaultValue={member?.role || "member"} name="role">
+        <option value="member">Membro</option>
+        <option value="admin">Admin</option>
+      </select>
+      <input
+        autoComplete="new-password"
+        className="form-input"
+        name="password"
+        placeholder={mode === "create" ? "Senha inicial" : "Nova senha (opcional)"}
+        required={mode === "create"}
+        type="password"
+      />
+      <div className="team-form-actions">
+        <button className="btn" type="submit">{mode === "create" ? "Adicionar membro" : "Salvar"}</button>
+        {onCancel ? <button className="btn" onClick={onCancel} type="button">Cancelar</button> : null}
+      </div>
+    </form>
+  );
+}
+
+function TeamMemberRow({ canEdit, currentUser, member, onRemoveMember, onUpdateMember }) {
+  const [editing, setEditing] = useState(false);
+
+  if (editing) {
+    return (
+      <div className="team-panel">
+        <TeamForm
+          member={member}
+          mode="edit"
+          onCancel={() => setEditing(false)}
+          onSubmit={(formData) => onUpdateMember(member.id, formData)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="team-row">
+      <span>{member.name}</span>
+      <span>{member.area || "Sem área"}</span>
+      <span>{member.email}</span>
+      <span className={`role-badge ${member.role === "admin" ? "admin" : ""}`}>
+        {member.role === "admin" ? "Admin" : "Membro"}
+      </span>
+      {canEdit ? (
+        <span className="team-actions">
+          <button className="btn" onClick={() => setEditing(true)} type="button">Editar</button>
+          <button
+            className="btn danger-btn"
+            disabled={currentUser?.id === member.id}
+            onClick={() => onRemoveMember(member)}
+            type="button"
+          >
+            Remover
+          </button>
+        </span>
+      ) : null}
+    </div>
   );
 }
 
@@ -733,6 +895,10 @@ function formatNumber(value) {
 
 function formatDate(value) {
   return new Date(`${value}T00:00:00`).toLocaleDateString("pt-BR");
+}
+
+function sortTeam(team) {
+  return [...team].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 }
 
 function isOverdue(value) {

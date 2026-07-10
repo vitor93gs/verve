@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAuthenticated, unauthorized } from "@/lib/auth";
+import { getSession, isAuthenticated, unauthorized } from "@/lib/auth";
 import { getDashboardData } from "@/lib/data";
 import { demandStages, monthlyStages, tabs } from "@/lib/seedData";
 
@@ -12,6 +12,7 @@ export async function GET() {
     const data = await getDashboardData();
     return NextResponse.json({
       ...data,
+      currentUser: getSession(),
       demandStages,
       monthlyStages,
       tabs

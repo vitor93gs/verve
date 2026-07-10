@@ -17,7 +17,7 @@ export default function Login() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        username: formData.get("username"),
+        email: formData.get("email"),
         password: formData.get("password")
       })
     });
@@ -46,8 +46,8 @@ export default function Login() {
         </div>
         <form className="login-form" onSubmit={handleSubmit}>
           <label>
-            <span>Usuário</span>
-            <input autoComplete="username" className="form-input" name="username" required />
+            <span>E-mail</span>
+            <input autoComplete="email" className="form-input" name="email" required type="email" />
           </label>
           <label>
             <span>Senha</span>

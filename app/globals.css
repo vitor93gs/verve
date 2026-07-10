@@ -371,9 +371,61 @@ select {
   display: grid;
   font-size: 12.5px;
   gap: 0.6rem;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1.3fr auto auto;
   margin-bottom: 0.5rem;
   padding: 0.6rem 0.8rem;
+}
+
+.team-panel,
+.team-form {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.team-panel {
+  margin-bottom: 0.5rem;
+  padding: 0.7rem;
+}
+
+.team-form {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(5, minmax(130px, 1fr)) auto;
+  margin-bottom: 0.9rem;
+  padding: 0.7rem;
+}
+
+.team-form.create {
+  margin-top: 1rem;
+}
+
+.team-form .form-input {
+  min-width: 0;
+  width: 100%;
+}
+
+.team-form-actions,
+.team-actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.role-badge {
+  background: rgba(74, 56, 45, 0.08);
+  border-radius: 20px;
+  color: var(--marrom-deep);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.role-badge.admin {
+  background: var(--marrom);
+  color: #fff;
 }
 
 .calendar-grid {
@@ -677,6 +729,10 @@ select {
   }
 
   .team-row {
+    grid-template-columns: 1fr;
+  }
+
+  .team-form {
     grid-template-columns: 1fr;
   }
 }

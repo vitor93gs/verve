@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { authCookieName, createSessionToken, isValidLogin } from "@/lib/auth";
+import { authCookieName, createSessionToken } from "@/lib/auth";
+import { ensureSeeded } from "@/lib/data";
+import { getDb } from "@/lib/mongodb";
+import { verifyPassword } from "@/lib/passwords";
 
 export async function POST(request) {
   let body;
@@ -10,14 +13,23 @@ export async function POST(request) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const { username, password } = body;
+  const email = body.email?.trim().toLowerCase();
+  const { password } = body;
 
-  if (!isValidLogin(username, password)) {
-    return NextResponse.json({ error: "Usuário ou senha inválidos." }, { status: 401 });
+  if (!email || !password) {
+    return NextResponse.json({ error: "E-mail e senha são obrigatórios." }, { status: 400 });
+  }
+
+  await ensureSeeded();
+  const db = await getDb();
+  const user = await db.collection("team").findOne({ email });
+
+  if (!user || !verifyPassword(password, user.passwordHash)) {
+    return NextResponse.json({ error: "E-mail ou senha inválidos." }, { status: 401 });
   }
 
   const response = NextResponse.json({ ok: true });
-  response.cookies.set(authCookieName, createSessionToken(), {
+  response.cookies.set(authCookieName, createSessionToken(user), {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
