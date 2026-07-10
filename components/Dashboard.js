@@ -11,7 +11,10 @@ export default function Dashboard() {
   const [error, setError] = useState("");
   const [currentTab, setCurrentTab] = useState("clientes");
   const [selectedClient, setSelectedClient] = useState("c0");
-  const [calCursor] = useState({ y: 2026, m: 6 });
+  const [calCursor, setCalCursor] = useState(() => {
+    const today = new Date();
+    return { y: today.getFullYear(), m: today.getMonth() };
+  });
   const [savingIds, setSavingIds] = useState(new Set());
 
   useEffect(() => {
@@ -88,6 +91,7 @@ export default function Dashboard() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        clientId: client.id,
         client: client.name,
         title,
         respId: formData.get("respId"),
@@ -104,11 +108,74 @@ export default function Dashboard() {
     setData((prev) => ({ ...prev, demands: [...prev.demands, created] }));
   }
 
+  async function addClient(formData) {
+    const name = formData.get("name")?.trim();
+    if (!name) return;
+
+    const response = await fetch("/api/clients", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name,
+        drive: formData.get("drive"),
+        docs: formData.get("docs"),
+        instagram: formData.get("instagram")
+      })
+    });
+    const created = await response.json();
+
+    if (!response.ok) {
+      setError(created.error || "Erro ao criar cliente.");
+      return;
+    }
+
+    setData((prev) => ({ ...prev, clients: [...prev.clients, created] }));
+    setSelectedClient(created.id);
+  }
+
+  async function removeClient(client) {
+    const confirmed = window.confirm(`Remover ${client.name}? As demandas deste cliente tambem serao removidas.`);
+    if (!confirmed) return;
+
+    setSaving(client.id, true);
+
+    try {
+      const response = await fetch(`/api/clients/${client.id}`, { method: "DELETE" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Erro ao remover cliente.");
+
+      setData((prev) => {
+        const clients = prev.clients.filter((item) => item.id !== client.id);
+        setSelectedClient((current) => (current === client.id ? clients[0]?.id || "" : current));
+
+        return {
+          ...prev,
+          clients,
+          demands: prev.demands.filter((demand) => demand.clientId !== client.id && demand.client !== client.name),
+          metricsHistory: Object.fromEntries(
+            Object.entries(prev.metricsHistory).filter(([clientId]) => clientId !== client.id)
+          )
+        };
+      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(client.id, false);
+    }
+  }
+
   function moveClient(client, direction) {
     const stages = data.monthlyStages;
     const index = stages.findIndex((stage) => stage.key === client.stage);
     const next = (index + direction + stages.length) % stages.length;
     patchClientStage(client.id, stages[next].key);
+  }
+
+  function moveCalendar(direction) {
+    setCalCursor((current) => {
+      const next = new Date(current.y, current.m + direction, 1);
+      return { y: next.getFullYear(), m: next.getMonth() };
+    });
   }
 
   function setSaving(id, isSaving) {
@@ -168,7 +235,9 @@ export default function Dashboard() {
           demands={data.demands}
           metricsHistory={data.metricsHistory}
           monthlyStages={data.monthlyStages}
+          onAddClient={addClient}
           onAddDemand={addDemand}
+          onRemoveClient={removeClient}
           onSelectClient={setSelectedClient}
           onSetStage={patchClientStage}
           onToggleDone={(demand, done) => patchDemand(demand.id, { done })}
@@ -177,14 +246,17 @@ export default function Dashboard() {
           teamById={teamById}
         />
       ) : null}
+      {currentTab === "clientes" && !selected ? (
+        <ClientesEmpty onAddClient={addClient} />
+      ) : null}
       {currentTab === "processo" ? (
         <Processo clients={data.clients} monthlyStages={data.monthlyStages} moveClient={moveClient} savingIds={savingIds} />
       ) : null}
       {currentTab === "demandas" ? (
-        <Demandas demandStages={data.demandStages} demands={data.demands} teamById={teamById} />
+        <Demandas demands={data.demands} onToggleDone={(demand, done) => patchDemand(demand.id, { done })} teamById={teamById} />
       ) : null}
       {currentTab === "pauta" ? <Pauta demands={data.demands} teamById={teamById} /> : null}
-      {currentTab === "calendario" ? <Calendario calCursor={calCursor} demands={data.demands} /> : null}
+      {currentTab === "calendario" ? <Calendario calCursor={calCursor} demands={data.demands} onMoveMonth={moveCalendar} /> : null}
       {currentTab === "equipe" ? <Equipe team={data.team} /> : null}
     </>
   );
@@ -197,7 +269,9 @@ function Clientes(props) {
     demands,
     metricsHistory,
     monthlyStages,
+    onAddClient,
     onAddDemand,
+    onRemoveClient,
     onSelectClient,
     onSetStage,
     onToggleDone,
@@ -211,6 +285,7 @@ function Clientes(props) {
     <div className="shell">
       <aside className="sidebar">
         <p className="side-eyebrow">Clientes ({clients.length})</p>
+        <AddClientForm onAddClient={onAddClient} />
         {clients.map((item) => (
           <div
             className={`client-item ${item.id === selectedClient ? "active" : ""}`}
@@ -224,7 +299,12 @@ function Clientes(props) {
         ))}
       </aside>
       <main className="main">
-        <h1 className="detail-title">{client.name}</h1>
+        <div className="detail-head">
+          <h1 className="detail-title">{client.name}</h1>
+          <button className="btn danger-btn" onClick={() => onRemoveClient(client)} type="button">
+            Remover cliente
+          </button>
+        </div>
 
         <p className="section-title">Status do cliente</p>
         <div className="stage-pills">
@@ -252,7 +332,7 @@ function Clientes(props) {
         <p className="section-title">Demandas deste cliente</p>
         <ClientDemands
           client={client}
-          demands={demands.filter((demand) => demand.client === client.name)}
+          demands={demands.filter((demand) => demand.clientId === client.id || demand.client === client.name)}
           onAddDemand={onAddDemand}
           onToggleDone={onToggleDone}
           team={team}
@@ -263,6 +343,39 @@ function Clientes(props) {
         {history ? <Insights history={history} /> : <p className="empty-note">Nenhum mês registrado ainda para este cliente.</p>}
       </main>
     </div>
+  );
+}
+
+function ClientesEmpty({ onAddClient }) {
+  return (
+    <div className="shell">
+      <aside className="sidebar">
+        <p className="side-eyebrow">Clientes (0)</p>
+        <AddClientForm onAddClient={onAddClient} />
+      </aside>
+      <main className="main">
+        <p className="empty-note">Nenhum cliente cadastrado ainda.</p>
+      </main>
+    </div>
+  );
+}
+
+function AddClientForm({ onAddClient }) {
+  function handleSubmit(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    onAddClient(new FormData(form));
+    form.reset();
+  }
+
+  return (
+    <form className="client-form" onSubmit={handleSubmit}>
+      <input className="form-input" name="name" placeholder="Nome do cliente" />
+      <input className="form-input" name="drive" placeholder="Drive" />
+      <input className="form-input" name="docs" placeholder="Docs" />
+      <input className="form-input" name="instagram" placeholder="Instagram" />
+      <button className="btn" type="submit">Adicionar cliente</button>
+    </form>
   );
 }
 
@@ -350,27 +463,52 @@ function Processo({ clients, monthlyStages, moveClient, savingIds }) {
   );
 }
 
-function Demandas({ demandStages, demands, teamById }) {
+function Demandas({ demands, onToggleDone, teamById }) {
+  const today = todayString();
+  const dueToday = demands.filter((demand) => !demand.done && demand.deadline === today);
+  const overdue = demands.filter((demand) => !demand.done && demand.deadline && demand.deadline < today);
+
   return (
     <main className="main">
-      <div className="board demandas">
-        {demandStages.map((stage) => (
-          <div className="board-col" key={stage.key}>
-            <p className="board-col-title">{stage.label}</p>
-            {demands.filter((demand) => demand.stage === stage.key).map((demand) => (
-              <div className="board-card" key={demand.id}>
-                <div style={{ color: "var(--vinho)", fontFamily: "IBM Plex Mono", fontSize: 8, textTransform: "uppercase" }}>{demand.client}</div>
-                <div className="board-card-name">{demand.title}</div>
-                {demand.respId ? <span className="item-responsible">{teamById.get(demand.respId)?.name}</span> : null}
-                <div className="board-card-actions">
-                  <button className="btn" type="button">Notificar</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
+      <h1 className="detail-title">Demandas</h1>
+      <DemandList
+        demands={dueToday}
+        emptyText="Nenhuma demanda para entregar hoje."
+        onToggleDone={onToggleDone}
+        teamById={teamById}
+        title="Para entregar hoje"
+      />
+      <DemandList
+        demands={overdue}
+        emptyText="Nenhuma demanda atrasada."
+        onToggleDone={onToggleDone}
+        teamById={teamById}
+        title="Atrasadas"
+      />
     </main>
+  );
+}
+
+function DemandList({ demands, emptyText, onToggleDone, teamById, title }) {
+  return (
+    <section className="demand-section">
+      <p className="section-title">{title} ({demands.length})</p>
+      {demands.length ? (
+        demands.map((demand) => (
+          <div className="item-row" key={demand.id}>
+            <input checked={demand.done} onChange={(event) => onToggleDone(demand, event.target.checked)} type="checkbox" />
+            <span style={{ flex: 1 }}>
+              <strong>{demand.client}</strong> - {demand.title}
+            </span>
+            <StatusBadge demand={demand} />
+            {demand.respId ? <span className="item-responsible">{teamById.get(demand.respId)?.name}</span> : null}
+            {demand.deadline ? <span style={{ color: "var(--vinho)", fontFamily: "IBM Plex Mono", fontSize: 10 }}>{formatDate(demand.deadline)}</span> : null}
+          </div>
+        ))
+      ) : (
+        <p className="empty-note">{emptyText}</p>
+      )}
+    </section>
   );
 }
 
@@ -402,7 +540,7 @@ function Pauta({ demands, teamById }) {
   );
 }
 
-function Calendario({ calCursor, demands }) {
+function Calendario({ calCursor, demands, onMoveMonth }) {
   const first = new Date(calCursor.y, calCursor.m, 1);
   const startDay = first.getDay();
   const daysInMonth = new Date(calCursor.y, calCursor.m + 1, 0).getDate();
@@ -411,7 +549,11 @@ function Calendario({ calCursor, demands }) {
 
   return (
     <main className="main">
-      <h1 className="detail-title">{monthNames[calCursor.m]} {calCursor.y}</h1>
+      <div className="calendar-head">
+        <button aria-label="Mês anterior" className="icon-btn" onClick={() => onMoveMonth(-1)} title="Mês anterior" type="button">‹</button>
+        <h1 className="detail-title">{monthNames[calCursor.m]} {calCursor.y}</h1>
+        <button aria-label="Próximo mês" className="icon-btn" onClick={() => onMoveMonth(1)} title="Próximo mês" type="button">›</button>
+      </div>
       <div className="calendar-grid">
         {weekdays.map((weekday) => <div className="calendar-weekday" key={weekday}>{weekday}</div>)}
       </div>
@@ -423,8 +565,20 @@ function Calendario({ calCursor, demands }) {
           const overdue = items.some((demand) => !demand.done && isOverdue(dateString));
           return (
             <div className="calendar-cell" key={dateString}>
-              {day}
-              {items.length ? <div className={`calendar-badge ${overdue ? "overdue" : ""}`}>{items.length}</div> : null}
+              <div className="calendar-day-head">
+                <span>{day}</span>
+                {items.length ? <span className={`calendar-badge ${overdue ? "overdue" : ""}`}>{items.length}</span> : null}
+              </div>
+              {items.length ? (
+                <div className="calendar-demand-list">
+                  {items.map((demand) => (
+                    <div className="calendar-demand" key={demand.id}>
+                      <strong>{demand.client}</strong>
+                      <span>{demand.title}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           );
         })}
@@ -583,6 +737,13 @@ function formatDate(value) {
 
 function isOverdue(value) {
   if (!value) return false;
-  const today = new Date().toISOString().slice(0, 10);
-  return value < today;
+  return value < todayString();
+}
+
+function todayString() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
