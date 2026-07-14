@@ -8,29 +8,34 @@ export default function Login() {
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (loading) return;
     setError("");
     setLoading(true);
 
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    const response = await fetch("/api/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: formData.get("email"),
-        password: formData.get("password")
-      })
-    });
-    const payload = await response.json();
+    try {
+      const form = event.currentTarget;
+      const formData = new FormData(form);
+      const response = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: formData.get("email"),
+          password: formData.get("password")
+        })
+      });
+      const payload = await response.json();
 
-    setLoading(false);
+      if (!response.ok) {
+        setError(payload.error || "Não foi possível entrar.");
+        setLoading(false);
+        return;
+      }
 
-    if (!response.ok) {
-      setError(payload.error || "Não foi possível entrar.");
-      return;
+      window.location.reload();
+    } catch (err) {
+      setError("Não foi possível entrar.");
+      setLoading(false);
     }
-
-    window.location.reload();
   }
 
   return (
@@ -47,14 +52,14 @@ export default function Login() {
         <form className="login-form" onSubmit={handleSubmit}>
           <label>
             <span>E-mail</span>
-            <input autoComplete="email" className="form-input" name="email" required type="email" />
+            <input autoComplete="email" className="form-input" disabled={loading} name="email" required type="email" />
           </label>
           <label>
             <span>Senha</span>
-            <input autoComplete="current-password" className="form-input" name="password" required type="password" />
+            <input autoComplete="current-password" className="form-input" disabled={loading} name="password" required type="password" />
           </label>
           {error ? <p className="login-error">{error}</p> : null}
-          <button className="btn login-submit" disabled={loading} type="submit">
+          <button className={`btn login-submit ${loading ? "is-loading" : ""}`} disabled={loading} type="submit">
             {loading ? "Entrando..." : "Entrar"}
           </button>
         </form>

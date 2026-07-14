@@ -104,6 +104,43 @@ select {
   background: var(--bege);
 }
 
+.tab-btn:disabled,
+.btn:disabled,
+.icon-btn:disabled,
+.stage-pill:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.tab-btn:disabled:hover,
+.btn:disabled:hover,
+.icon-btn:disabled:hover {
+  background: #fff;
+}
+
+.is-loading {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.45rem;
+  justify-content: center;
+}
+
+.is-loading::before {
+  animation: spin 0.75s linear infinite;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 999px;
+  content: "";
+  height: 0.75rem;
+  width: 0.75rem;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .tab-btn.active {
   background: var(--marrom);
   border-color: var(--marrom);
@@ -234,6 +271,16 @@ select {
   font-size: 12px;
   font-weight: 500;
   overflow-wrap: anywhere;
+}
+
+.link-value a {
+  color: var(--vinho);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.link-value a:hover {
+  color: var(--marrom-deep);
 }
 
 .item-row,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const statusLabels = { afazer: "A fazer", atrasado: "Atrasado", concluido: "Concluído" };
 const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -16,6 +16,7 @@ export default function Dashboard() {
     return { y: today.getFullYear(), m: today.getMonth() };
   });
   const [savingIds, setSavingIds] = useState(new Set());
+  const savingRef = useRef(new Set());
 
   useEffect(() => {
     fetch("/api/bootstrap")
@@ -34,7 +35,9 @@ export default function Dashboard() {
   const teamById = useMemo(() => new Map((data?.team || []).map((member) => [member.id, member])), [data?.team]);
 
   async function patchClientStage(clientId, stage) {
-    setSaving(clientId, true);
+    const savingKey = `client-stage:${clientId}`;
+    if (savingRef.current.has(savingKey)) return false;
+    setSaving(savingKey, true);
     setData((prev) => ({
       ...prev,
       clients: prev.clients.map((client) => (client.id === clientId ? { ...client, stage } : client))
@@ -54,13 +57,18 @@ export default function Dashboard() {
       }));
     } catch (err) {
       setError(err.message);
+      return false;
     } finally {
-      setSaving(clientId, false);
+      setSaving(savingKey, false);
     }
+
+    return true;
   }
 
   async function patchDemand(demandId, update) {
-    setSaving(demandId, true);
+    const savingKey = `demand:${demandId}`;
+    if (savingRef.current.has(savingKey)) return false;
+    setSaving(savingKey, true);
     setData((prev) => ({
       ...prev,
       demands: prev.demands.map((demand) => (demand.id === demandId ? { ...demand, ...update } : demand))
@@ -80,53 +88,69 @@ export default function Dashboard() {
       }));
     } catch (err) {
       setError(err.message);
+      return false;
     } finally {
-      setSaving(demandId, false);
+      setSaving(savingKey, false);
     }
+
+    return true;
   }
 
   async function addDemand(client, formData) {
+    const savingKey = `add-demand:${client.id}`;
+    if (savingRef.current.has(savingKey)) return false;
     const title = formData.get("title")?.trim();
-    if (!title) return;
+    if (!title) return false;
 
-    const response = await fetch("/api/demands", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        clientId: client.id,
-        client: client.name,
-        title,
-        respId: formData.get("respId"),
-        deadline: formData.get("deadline")
-      })
-    });
-    const created = await response.json();
+    setSaving(savingKey, true);
 
-    if (!response.ok) {
-      setError(created.error || "Erro ao criar demanda.");
-      return;
+    try {
+      const response = await fetch("/api/demands", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientId: client.id,
+          client: client.name,
+          title,
+          respId: formData.get("respId"),
+          deadline: formData.get("deadline")
+        })
+      });
+      const created = await response.json();
+
+      if (!response.ok) {
+        setError(created.error || "Erro ao criar demanda.");
+        return false;
+      }
+
+      setData((prev) => ({ ...prev, demands: [...prev.demands, created] }));
+      return true;
+    } catch (err) {
+      setError(err.message || "Erro ao criar demanda.");
+      return false;
+    } finally {
+      setSaving(savingKey, false);
     }
-
-    setData((prev) => ({ ...prev, demands: [...prev.demands, created] }));
   }
 
   async function updateDemand(demandId, formData) {
     const title = formData.get("title")?.trim();
     if (!title) return false;
 
-    await patchDemand(demandId, {
+    return patchDemand(demandId, {
       title,
       respId: formData.get("respId"),
       deadline: formData.get("deadline")
     });
-    return true;
   }
 
   async function archiveDemand(demand) {
+    const savingKey = `archive-demand:${demand.id}`;
+    if (savingRef.current.has(savingKey)) return false;
     const confirmed = window.confirm(`Arquivar a demanda "${demand.title}"? O histórico será mantido.`);
     if (!confirmed) return;
 
-    setSaving(demand.id, true);
+    setSaving(savingKey, true);
 
     try {
       const response = await fetch(`/api/demands/${demand.id}`, { method: "DELETE" });
@@ -139,40 +163,54 @@ export default function Dashboard() {
     } catch (err) {
       setError(err.message);
     } finally {
-      setSaving(demand.id, false);
+      setSaving(savingKey, false);
     }
   }
 
   async function addClient(formData) {
+    const savingKey = "add-client";
+    if (savingRef.current.has(savingKey)) return false;
     const name = formData.get("name")?.trim();
-    if (!name) return;
+    if (!name) return false;
 
-    const response = await fetch("/api/clients", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name,
-        drive: formData.get("drive"),
-        docs: formData.get("docs"),
-        instagram: formData.get("instagram")
-      })
-    });
-    const created = await response.json();
+    setSaving(savingKey, true);
 
-    if (!response.ok) {
-      setError(created.error || "Erro ao criar cliente.");
-      return;
+    try {
+      const response = await fetch("/api/clients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          drive: formData.get("drive"),
+          docs: formData.get("docs"),
+          instagram: formData.get("instagram")
+        })
+      });
+      const created = await response.json();
+
+      if (!response.ok) {
+        setError(created.error || "Erro ao criar cliente.");
+        return false;
+      }
+
+      setData((prev) => ({ ...prev, clients: [...prev.clients, created] }));
+      setSelectedClient(created.id);
+      return true;
+    } catch (err) {
+      setError(err.message || "Erro ao criar cliente.");
+      return false;
+    } finally {
+      setSaving(savingKey, false);
     }
-
-    setData((prev) => ({ ...prev, clients: [...prev.clients, created] }));
-    setSelectedClient(created.id);
   }
 
   async function removeClient(client) {
+    const savingKey = `remove-client:${client.id}`;
+    if (savingRef.current.has(savingKey)) return false;
     const confirmed = window.confirm(`Remover ${client.name}? As demandas deste cliente tambem serao removidas.`);
     if (!confirmed) return;
 
-    setSaving(client.id, true);
+    setSaving(savingKey, true);
 
     try {
       const response = await fetch(`/api/clients/${client.id}`, { method: "DELETE" });
@@ -195,11 +233,13 @@ export default function Dashboard() {
     } catch (err) {
       setError(err.message);
     } finally {
-      setSaving(client.id, false);
+      setSaving(savingKey, false);
     }
   }
 
   async function addTeamMember(formData) {
+    const savingKey = "team-add";
+    if (savingRef.current.has(savingKey)) return false;
     const payload = {
       name: formData.get("name"),
       area: formData.get("area"),
@@ -208,23 +248,31 @@ export default function Dashboard() {
       password: formData.get("password")
     };
 
-    const response = await fetch("/api/team", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    const created = await response.json();
+    setSaving(savingKey, true);
 
-    if (!response.ok) {
-      setError(created.error || "Erro ao criar membro.");
-      return false;
+    try {
+      const response = await fetch("/api/team", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const created = await response.json();
+
+      if (!response.ok) {
+        setError(created.error || "Erro ao criar membro.");
+        return false;
+      }
+
+      setData((prev) => ({ ...prev, team: sortTeam([...prev.team, created]) }));
+      return true;
+    } finally {
+      setSaving(savingKey, false);
     }
-
-    setData((prev) => ({ ...prev, team: sortTeam([...prev.team, created]) }));
-    return true;
   }
 
   async function updateTeamMember(memberId, formData) {
+    const savingKey = `team:${memberId}`;
+    if (savingRef.current.has(savingKey)) return false;
     const payload = {
       name: formData.get("name"),
       area: formData.get("area"),
@@ -233,42 +281,58 @@ export default function Dashboard() {
       password: formData.get("password")
     };
 
-    const response = await fetch(`/api/team/${memberId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    const updated = await response.json();
+    setSaving(savingKey, true);
 
-    if (!response.ok) {
-      setError(updated.error || "Erro ao atualizar membro.");
-      return false;
+    try {
+      const response = await fetch(`/api/team/${memberId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const updated = await response.json();
+
+      if (!response.ok) {
+        setError(updated.error || "Erro ao atualizar membro.");
+        return false;
+      }
+
+      setData((prev) => ({
+        ...prev,
+        team: sortTeam(prev.team.map((member) => (member.id === memberId ? updated : member)))
+      }));
+      return true;
+    } finally {
+      setSaving(savingKey, false);
     }
-
-    setData((prev) => ({
-      ...prev,
-      team: sortTeam(prev.team.map((member) => (member.id === memberId ? updated : member)))
-    }));
-    return true;
   }
 
   async function removeTeamMember(member) {
+    const savingKey = `team-remove:${member.id}`;
+    if (savingRef.current.has(savingKey)) return false;
     const confirmed = window.confirm(`Remover ${member.name} da equipe?`);
-    if (!confirmed) return;
+    if (!confirmed) return false;
 
-    const response = await fetch(`/api/team/${member.id}`, { method: "DELETE" });
-    const payload = await response.json();
+    setSaving(savingKey, true);
 
-    if (!response.ok) {
-      setError(payload.error || "Erro ao remover membro.");
-      return;
+    try {
+      const response = await fetch(`/api/team/${member.id}`, { method: "DELETE" });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        setError(payload.error || "Erro ao remover membro.");
+        return false;
+      }
+
+      setData((prev) => ({ ...prev, team: prev.team.filter((item) => item.id !== member.id) }));
+      return true;
+    } finally {
+      setSaving(savingKey, false);
     }
-
-    setData((prev) => ({ ...prev, team: prev.team.filter((item) => item.id !== member.id) }));
   }
 
   async function notifyDemand(demand) {
     const savingKey = `notify:${demand.id}`;
+    if (savingRef.current.has(savingKey)) return false;
     setSaving(savingKey, true);
     setError("");
 
@@ -278,9 +342,11 @@ export default function Dashboard() {
       if (!response.ok) throw new Error(payload.error || "Erro ao enviar notificação.");
     } catch (err) {
       setError(err.message);
+      return false;
     } finally {
       setSaving(savingKey, false);
     }
+    return true;
   }
 
   function moveClient(client, direction) {
@@ -298,6 +364,10 @@ export default function Dashboard() {
   }
 
   function setSaving(id, isSaving) {
+    const nextRef = new Set(savingRef.current);
+    if (isSaving) nextRef.add(id);
+    else nextRef.delete(id);
+    savingRef.current = nextRef;
     setSavingIds((prev) => {
       const next = new Set(prev);
       if (isSaving) next.add(id);
@@ -307,8 +377,16 @@ export default function Dashboard() {
   }
 
   async function logout() {
-    await fetch("/api/logout", { method: "POST" });
-    window.location.reload();
+    const savingKey = "logout";
+    if (savingRef.current.has(savingKey)) return;
+    setSaving(savingKey, true);
+    try {
+      await fetch("/api/logout", { method: "POST" });
+      window.location.reload();
+    } catch (err) {
+      setError("Nao foi possivel sair. Tente novamente.");
+      setSaving(savingKey, false);
+    }
   }
 
   if (error && !data) {
@@ -341,8 +419,8 @@ export default function Dashboard() {
               {tab.label}
             </button>
           ))}
-          <button className="tab-btn logout-btn" onClick={logout} type="button">
-            Sair
+          <button className={`tab-btn logout-btn ${savingIds.has("logout") ? "is-loading" : ""}`} disabled={savingIds.has("logout")} onClick={logout} type="button">
+            {savingIds.has("logout") ? "Saindo..." : "Sair"}
           </button>
         </nav>
       </header>
@@ -371,7 +449,7 @@ export default function Dashboard() {
         />
       ) : null}
       {currentTab === "clientes" && !selected ? (
-        <ClientesEmpty isAdmin={isAdmin} onAddClient={addClient} />
+        <ClientesEmpty isAdmin={isAdmin} onAddClient={addClient} savingIds={savingIds} />
       ) : null}
       {currentTab === "processo" ? (
         <Processo clients={data.clients} monthlyStages={data.monthlyStages} moveClient={moveClient} savingIds={savingIds} />
@@ -396,6 +474,7 @@ export default function Dashboard() {
           onAddMember={addTeamMember}
           onRemoveMember={removeTeamMember}
           onUpdateMember={updateTeamMember}
+          savingIds={savingIds}
           team={data.team}
         />
       ) : null}
@@ -432,7 +511,7 @@ function Clientes(props) {
     <div className="shell">
       <aside className="sidebar">
         <p className="side-eyebrow">Clientes ({clients.length})</p>
-        {isAdmin ? <AddClientForm onAddClient={onAddClient} /> : null}
+        {isAdmin ? <AddClientForm onAddClient={onAddClient} savingIds={savingIds} /> : null}
         {clients.map((item) => (
           <div
             className={`client-item ${item.id === selectedClient ? "active" : ""}`}
@@ -449,8 +528,13 @@ function Clientes(props) {
         <div className="detail-head">
           <h1 className="detail-title">{client.name}</h1>
           {isAdmin ? (
-            <button className="btn danger-btn" onClick={() => onRemoveClient(client)} type="button">
-              Remover cliente
+            <button
+              className={`btn danger-btn ${savingIds.has(`remove-client:${client.id}`) ? "is-loading" : ""}`}
+              disabled={savingIds.has(`remove-client:${client.id}`)}
+              onClick={() => onRemoveClient(client)}
+              type="button"
+            >
+              {savingIds.has(`remove-client:${client.id}`) ? "Removendo..." : "Remover cliente"}
             </button>
           ) : null}
         </div>
@@ -460,6 +544,7 @@ function Clientes(props) {
           {monthlyStages.map((stage) => (
             <button
               className="stage-pill"
+              disabled={savingIds.has(`client-stage:${client.id}`)}
               key={stage.key}
               onClick={() => onSetStage(client.id, stage.key)}
               style={client.stage === stage.key ? { background: stage.color, borderColor: stage.color, color: "#fff" } : undefined}
@@ -499,12 +584,12 @@ function Clientes(props) {
   );
 }
 
-function ClientesEmpty({ isAdmin, onAddClient }) {
+function ClientesEmpty({ isAdmin, onAddClient, savingIds }) {
   return (
     <div className="shell">
       <aside className="sidebar">
         <p className="side-eyebrow">Clientes (0)</p>
-        {isAdmin ? <AddClientForm onAddClient={onAddClient} /> : null}
+        {isAdmin ? <AddClientForm onAddClient={onAddClient} savingIds={savingIds} /> : null}
       </aside>
       <main className="main">
         <p className="empty-note">
@@ -515,42 +600,56 @@ function ClientesEmpty({ isAdmin, onAddClient }) {
   );
 }
 
-function AddClientForm({ onAddClient }) {
-  function handleSubmit(event) {
+function AddClientForm({ onAddClient, savingIds }) {
+  const isSaving = savingIds.has("add-client");
+
+  async function handleSubmit(event) {
     event.preventDefault();
     const form = event.currentTarget;
-    onAddClient(new FormData(form));
-    form.reset();
+    const ok = await onAddClient(new FormData(form));
+    if (ok) form.reset();
   }
 
   return (
     <form className="client-form" onSubmit={handleSubmit}>
-      <input className="form-input" name="name" placeholder="Nome do cliente" />
-      <input className="form-input" name="drive" placeholder="Drive" />
-      <input className="form-input" name="docs" placeholder="Docs" />
-      <input className="form-input" name="instagram" placeholder="Instagram" />
-      <button className="btn" type="submit">Adicionar cliente</button>
+      <input className="form-input" disabled={isSaving} name="name" placeholder="Nome do cliente" />
+      <input className="form-input" disabled={isSaving} name="drive" placeholder="Drive" />
+      <input className="form-input" disabled={isSaving} name="docs" placeholder="Docs" />
+      <input className="form-input" disabled={isSaving} name="instagram" placeholder="Instagram" />
+      <button className={`btn ${isSaving ? "is-loading" : ""}`} disabled={isSaving} type="submit">
+        {isSaving ? "Adicionando..." : "Adicionar cliente"}
+      </button>
     </form>
   );
 }
 
 function LinkCard({ label, value }) {
+  const href = linkHref(value);
+
   return (
     <div className="link-card">
       <div className="link-label">{label}</div>
       <div className="link-value" style={!value ? { color: "var(--ink-soft)" } : undefined}>
-        {value || "Não adicionado"}
+        {href ? (
+          <a href={href} rel="noreferrer" target="_blank">
+            {value}
+          </a>
+        ) : (
+          value || "Não adicionado"
+        )}
       </div>
     </div>
   );
 }
 
 function ClientDemands({ client, demands, onAddDemand, onArchiveDemand, onNotifyDemand, onToggleDone, onUpdateDemand, savingIds, team, teamById }) {
-  function handleSubmit(event) {
+  const isAdding = savingIds.has(`add-demand:${client.id}`);
+
+  async function handleSubmit(event) {
     event.preventDefault();
     const form = event.currentTarget;
-    onAddDemand(client, new FormData(form));
-    form.reset();
+    const ok = await onAddDemand(client, new FormData(form));
+    if (ok) form.reset();
   }
 
   return (
@@ -579,15 +678,17 @@ function ClientDemands({ client, demands, onAddDemand, onArchiveDemand, onNotify
         onSubmit={handleSubmit}
         style={{ marginTop: "0.8rem" }}
       >
-        <input className="form-input grow" name="title" placeholder="Ex.: Vídeos liberados para edição" />
-        <select className="form-input" name="respId">
+        <input className="form-input grow" disabled={isAdding} name="title" placeholder="Ex.: Vídeos liberados para edição" />
+        <select className="form-input" disabled={isAdding} name="respId">
           <option value="">Sem responsável</option>
           {team.map((member) => (
             <option key={member.id} value={member.id}>{member.name}</option>
           ))}
         </select>
-        <input className="form-input" name="deadline" type="date" />
-        <button className="btn" type="submit">Adicionar</button>
+        <input className="form-input" disabled={isAdding} name="deadline" type="date" />
+        <button className={`btn ${isAdding ? "is-loading" : ""}`} disabled={isAdding} type="submit">
+          {isAdding ? "Adicionando..." : "Adicionar"}
+        </button>
       </form>
     </>
   );
@@ -607,8 +708,8 @@ function Processo({ clients, monthlyStages, moveClient, savingIds }) {
               <div className="board-card" key={client.id}>
                 <div className="board-card-name">{client.name}</div>
                 <div className="board-card-actions">
-                  <button className="icon-btn" disabled={savingIds.has(client.id)} onClick={() => moveClient(client, -1)} title="Voltar etapa" type="button">‹</button>
-                  <button className="icon-btn" disabled={savingIds.has(client.id)} onClick={() => moveClient(client, 1)} title="Avançar etapa" type="button">›</button>
+                  <button className="icon-btn" disabled={savingIds.has(`client-stage:${client.id}`)} onClick={() => moveClient(client, -1)} title="Voltar etapa" type="button">‹</button>
+                  <button className="icon-btn" disabled={savingIds.has(`client-stage:${client.id}`)} onClick={() => moveClient(client, 1)} title="Avançar etapa" type="button">›</button>
                 </div>
               </div>
             ))}
@@ -676,6 +777,10 @@ function DemandList({ demands, emptyText, onArchiveDemand, onNotifyDemand, onTog
 
 function DemandRow({ demand, onArchiveDemand, onNotifyDemand, onToggleDone, onUpdateDemand, savingIds, team, teamById }) {
   const [editing, setEditing] = useState(false);
+  const demandSaving = savingIds.has(`demand:${demand.id}`);
+  const archiveSaving = savingIds.has(`archive-demand:${demand.id}`);
+  const notifySaving = savingIds.has(`notify:${demand.id}`);
+  const anySaving = demandSaving || archiveSaving || notifySaving;
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -686,23 +791,25 @@ function DemandRow({ demand, onArchiveDemand, onNotifyDemand, onToggleDone, onUp
   if (editing) {
     return (
       <form className="demand-edit-row" onSubmit={handleSubmit}>
-        <input className="form-input grow" defaultValue={demand.title} name="title" placeholder="Título da demanda" />
-        <select className="form-input" defaultValue={demand.respId || ""} name="respId">
+        <input className="form-input grow" defaultValue={demand.title} disabled={demandSaving} name="title" placeholder="Título da demanda" />
+        <select className="form-input" defaultValue={demand.respId || ""} disabled={demandSaving} name="respId">
           <option value="">Sem responsável</option>
           {team.map((member) => (
             <option key={member.id} value={member.id}>{member.name}</option>
           ))}
         </select>
-        <input className="form-input" defaultValue={demand.deadline || ""} name="deadline" type="date" />
-        <button className="btn" disabled={savingIds.has(demand.id)} type="submit">Salvar</button>
-        <button className="btn" onClick={() => setEditing(false)} type="button">Cancelar</button>
+        <input className="form-input" defaultValue={demand.deadline || ""} disabled={demandSaving} name="deadline" type="date" />
+        <button className={`btn ${demandSaving ? "is-loading" : ""}`} disabled={demandSaving} type="submit">
+          {demandSaving ? "Salvando..." : "Salvar"}
+        </button>
+        <button className="btn" disabled={demandSaving} onClick={() => setEditing(false)} type="button">Cancelar</button>
       </form>
     );
   }
 
   return (
     <div className="item-row">
-      <input checked={demand.done} onChange={(event) => onToggleDone(demand, event.target.checked)} type="checkbox" />
+      <input checked={demand.done} disabled={anySaving} onChange={(event) => onToggleDone(demand, event.target.checked)} type="checkbox" />
       <span style={demand.done ? { color: "var(--ink-soft)", flex: 1, textDecoration: "line-through" } : { flex: 1 }}>
         <strong>{demand.client}</strong> - {demand.title}
       </span>
@@ -710,12 +817,14 @@ function DemandRow({ demand, onArchiveDemand, onNotifyDemand, onToggleDone, onUp
       {demand.respId ? <span className="item-responsible">{teamById.get(demand.respId)?.name}</span> : null}
       {demand.deadline ? <span style={{ color: "var(--vinho)", fontFamily: "IBM Plex Mono", fontSize: 10 }}>{formatDate(demand.deadline)}</span> : null}
       {demand.respId && !demand.done ? (
-        <button className="btn" disabled={savingIds.has(`notify:${demand.id}`)} onClick={() => onNotifyDemand(demand)} type="button">
-          {savingIds.has(`notify:${demand.id}`) ? "Enviando..." : "Notificar"}
+        <button className={`btn ${notifySaving ? "is-loading" : ""}`} disabled={anySaving} onClick={() => onNotifyDemand(demand)} type="button">
+          {notifySaving ? "Enviando..." : "Notificar"}
         </button>
       ) : null}
-      <button className="btn" onClick={() => setEditing(true)} type="button">Editar</button>
-      <button className="btn danger-btn" disabled={savingIds.has(demand.id)} onClick={() => onArchiveDemand(demand)} type="button">Deletar</button>
+      <button className="btn" disabled={anySaving} onClick={() => setEditing(true)} type="button">Editar</button>
+      <button className={`btn danger-btn ${archiveSaving ? "is-loading" : ""}`} disabled={anySaving} onClick={() => onArchiveDemand(demand)} type="button">
+        {archiveSaving ? "Deletando..." : "Deletar"}
+      </button>
     </div>
   );
 }
@@ -861,14 +970,14 @@ function Historico({ demands }) {
   );
 }
 
-function Equipe({ currentUser, isAdmin, onAddMember, onRemoveMember, onUpdateMember, team }) {
+function Equipe({ currentUser, isAdmin, onAddMember, onRemoveMember, onUpdateMember, savingIds, team }) {
   return (
     <main className="main">
       <div className="detail-head">
         <h1 className="detail-title">Equipe</h1>
         {currentUser ? <span className="item-responsible">{currentUser.role === "admin" ? "Admin" : "Membro"}</span> : null}
       </div>
-      {isAdmin ? <TeamForm mode="create" onSubmit={onAddMember} /> : null}
+      {isAdmin ? <TeamForm mode="create" onSubmit={onAddMember} savingIds={savingIds} savingKey="team-add" /> : null}
       {team.map((member) => (
         <TeamMemberRow
           canEdit={isAdmin}
@@ -877,13 +986,16 @@ function Equipe({ currentUser, isAdmin, onAddMember, onRemoveMember, onUpdateMem
           member={member}
           onRemoveMember={onRemoveMember}
           onUpdateMember={onUpdateMember}
+          savingIds={savingIds}
         />
       ))}
     </main>
   );
 }
 
-function TeamForm({ member, mode, onCancel, onSubmit }) {
+function TeamForm({ member, mode, onCancel, onSubmit, savingIds, savingKey }) {
+  const isSaving = savingIds.has(savingKey);
+
   async function handleSubmit(event) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -894,31 +1006,37 @@ function TeamForm({ member, mode, onCancel, onSubmit }) {
 
   return (
     <form className={`team-form ${mode === "create" ? "create" : ""}`} onSubmit={handleSubmit}>
-      <input className="form-input" defaultValue={member?.name || ""} name="name" placeholder="Nome" required />
-      <input className="form-input" defaultValue={member?.area || ""} name="area" placeholder="Área" />
-      <input className="form-input" defaultValue={member?.email || ""} name="email" placeholder="E-mail" required type="email" />
-      <select className="form-input" defaultValue={member?.role || "member"} name="role">
+      <input className="form-input" defaultValue={member?.name || ""} disabled={isSaving} name="name" placeholder="Nome" required />
+      <input className="form-input" defaultValue={member?.area || ""} disabled={isSaving} name="area" placeholder="Área" />
+      <input className="form-input" defaultValue={member?.email || ""} disabled={isSaving} name="email" placeholder="E-mail" required type="email" />
+      <select className="form-input" defaultValue={member?.role || "member"} disabled={isSaving} name="role">
         <option value="member">Membro</option>
         <option value="admin">Admin</option>
       </select>
       <input
         autoComplete="new-password"
         className="form-input"
+        disabled={isSaving}
         name="password"
         placeholder={mode === "create" ? "Senha inicial" : "Nova senha (opcional)"}
         required={mode === "create"}
         type="password"
       />
       <div className="team-form-actions">
-        <button className="btn" type="submit">{mode === "create" ? "Adicionar membro" : "Salvar"}</button>
-        {onCancel ? <button className="btn" onClick={onCancel} type="button">Cancelar</button> : null}
+        <button className={`btn ${isSaving ? "is-loading" : ""}`} disabled={isSaving} type="submit">
+          {isSaving ? (mode === "create" ? "Adicionando..." : "Salvando...") : (mode === "create" ? "Adicionar membro" : "Salvar")}
+        </button>
+        {onCancel ? <button className="btn" disabled={isSaving} onClick={onCancel} type="button">Cancelar</button> : null}
       </div>
     </form>
   );
 }
 
-function TeamMemberRow({ canEdit, currentUser, member, onRemoveMember, onUpdateMember }) {
+function TeamMemberRow({ canEdit, currentUser, member, onRemoveMember, onUpdateMember, savingIds }) {
   const [editing, setEditing] = useState(false);
+  const editSaving = savingIds.has(`team:${member.id}`);
+  const removeSaving = savingIds.has(`team-remove:${member.id}`);
+  const anySaving = editSaving || removeSaving;
 
   if (editing) {
     return (
@@ -928,6 +1046,8 @@ function TeamMemberRow({ canEdit, currentUser, member, onRemoveMember, onUpdateM
           mode="edit"
           onCancel={() => setEditing(false)}
           onSubmit={(formData) => onUpdateMember(member.id, formData)}
+          savingIds={savingIds}
+          savingKey={`team:${member.id}`}
         />
       </div>
     );
@@ -943,14 +1063,14 @@ function TeamMemberRow({ canEdit, currentUser, member, onRemoveMember, onUpdateM
       </span>
       {canEdit ? (
         <span className="team-actions">
-          <button className="btn" onClick={() => setEditing(true)} type="button">Editar</button>
+          <button className="btn" disabled={anySaving} onClick={() => setEditing(true)} type="button">Editar</button>
           <button
-            className="btn danger-btn"
-            disabled={currentUser?.id === member.id}
+            className={`btn danger-btn ${removeSaving ? "is-loading" : ""}`}
+            disabled={currentUser?.id === member.id || anySaving}
             onClick={() => onRemoveMember(member)}
             type="button"
           >
-            Remover
+            {removeSaving ? "Removendo..." : "Remover"}
           </button>
         </span>
       ) : null}
@@ -1090,6 +1210,14 @@ function formatNumber(value) {
 
 function formatDate(value) {
   return new Date(`${value}T00:00:00`).toLocaleDateString("pt-BR");
+}
+
+function linkHref(value) {
+  if (!value) return "";
+  const trimmed = value.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^[\w.-]+\.[a-z]{2,}(\/.*)?$/i.test(trimmed)) return `https://${trimmed}`;
+  return "";
 }
 
 function formatDateTime(value) {
